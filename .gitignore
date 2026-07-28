@@ -1,0 +1,35 @@
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# SQLite database + uploads are runtime state, never committed
+data/
+public/uploads/
+
+.env
+.env.local
+.env*.local
+
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+next-env.d.ts
+.vercel
+
+# Raw, uncompressed source model (40MB) — kept locally as a backup of the
+# original upload. The site uses the decimated copy in public/models/, which
+# is small enough to commit and is the one that actually ships.
+assets/source-models/
+
+# Raw reference photos the studio uploaded outside the app (working copies
+# used by the site live in public/sample/ and are committed normally).
+picture/
+
+# Stray duplicate files left behind by the editor/downloader (e.g.
+# "page (1).tsx" next to "page.tsx"). Never part of the route tree — Next.js
+# only recognises the exact filename — so they're dead weight in the repo.
+*\ \(1\).*

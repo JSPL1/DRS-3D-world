@@ -1,0 +1,494 @@
+@import 'tailwindcss';
+
+/* ============================================================
+   DRS 3D WORLD — Design System
+   Black · Orange (#ff6b00) · White · Dark Gray · Glass
+
+   THEMING MODEL
+   -------------
+   Tailwind v4 compiles every colour utility to a CSS variable
+   (`text-white` → `color: var(--color-white)`, `bg-white/[0.03]` →
+   `color-mix(… var(--color-white) 3% …)`). So a light theme is achieved by
+   *redefining the variables* under `[data-theme='light']` rather than
+   rewriting ~488 utility classes across 66 files.
+
+   The ink scale is inverted wholesale, and `--color-white` — which the UI
+   uses to mean "primary foreground / subtle overlay" — becomes near-black.
+   Anywhere a brand-coloured surface needs genuinely white text, the variable
+   is re-flipped locally (see "Brand surfaces keep white ink" below).
+   ============================================================ */
+
+@theme {
+  /* Brand ------------------------------------------------- */
+  --color-flame-50: #fff4ec;
+  --color-flame-100: #ffe3ce;
+  --color-flame-200: #ffc39c;
+  --color-flame-300: #ff9d63;
+  --color-flame-400: #ff8433;
+  --color-flame-500: #ff6b00;
+  --color-flame-600: #e85d00;
+  --color-flame-700: #bf4a00;
+  --color-flame-800: #963a00;
+  --color-flame-900: #722c00;
+
+  /* Declared explicitly so the theme layer below can override it. */
+  --color-white: #ffffff;
+
+  /* Neutral ladder — tuned dark, not muddy.
+     950–600 are surfaces and hairlines; 500 and below carry text. The text
+     steps are held above 4.5:1 on the #0a0a0c panel background: the original
+     values (500 = #3a3a45, 400 = #55555f) measured 1.76:1 and 3.3:1, which
+     made 10px section labels effectively unreadable. */
+  --color-ink-950: #050506;
+  --color-ink-900: #0a0a0c;
+  --color-ink-850: #101013;
+  --color-ink-800: #16161a;
+  --color-ink-700: #1e1e24;
+  --color-ink-600: #2a2a32;
+  --color-ink-500: #7e7e8c;
+  --color-ink-400: #93939f;
+  --color-ink-300: #adadb8;
+  --color-ink-200: #c9c9d1;
+  --color-ink-100: #e6e6ea;
+
+  /* Type -------------------------------------------------- */
+  --font-display: var(--font-outfit), 'Segoe UI', system-ui, sans-serif;
+  --font-sans: var(--font-inter), 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
+
+  /* Motion — one easing vocabulary across the whole site --- */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quint: cubic-bezier(0.83, 0, 0.17, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Depth ------------------------------------------------- */
+  --shadow-glow-sm: 0 0 20px -4px rgba(255, 107, 0, 0.4);
+  --shadow-glow: 0 0 46px -8px rgba(255, 107, 0, 0.55);
+  --shadow-glow-lg: 0 0 90px -10px rgba(255, 107, 0, 0.5);
+  --shadow-lift: 0 24px 60px -20px rgba(0, 0, 0, 0.85);
+}
+
+/* ============================================================
+   Base — dark (default)
+   ============================================================ */
+
+:root {
+  --bg: var(--color-ink-950);
+  --fg: #ffffff;
+  --surface: rgba(255, 255, 255, 0.04);
+  --hairline: rgba(255, 255, 255, 0.08);
+  --grain-opacity: 0.035;
+  color-scheme: dark;
+}
+
+/* ============================================================
+   Light theme — variable overrides only
+   ============================================================ */
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  /* Inverted ink ladder: 950 is now the page, 100 the strongest text.
+     The split is deliberate — 700 and above are surfaces and hairlines, 600
+     and below are text. In the dark theme the middle steps are backgrounds,
+     but on white the same utilities land on small copy (timestamps, section
+     labels), so they have to clear 4.5:1 rather than mirror the dark values.
+     Measured on #ffffff: 600 = 4.63:1, 500 = 5.63:1, 400 = 7.05:1. */
+  --color-ink-950: #ffffff;
+  --color-ink-900: #f7f7f9;
+  --color-ink-850: #f2f2f5;
+  --color-ink-800: #ebebef;
+  --color-ink-700: #dddde3;
+  --color-ink-600: #74747f;
+  --color-ink-500: #64646f;
+  --color-ink-400: #55555f;
+  --color-ink-300: #41414b;
+  --color-ink-200: #2a2a33;
+  --color-ink-100: #16161c;
+
+  /* The UI's "white" means primary ink + subtle overlay. Both invert. */
+  --color-white: #101015;
+
+  --bg: #f6f6f8;
+  --fg: #101015;
+  --surface: rgba(0, 0, 0, 0.04);
+  --hairline: rgba(0, 0, 0, 0.10);
+  --grain-opacity: 0.018;
+
+  /* Shadows need to be far softer on light surfaces or they read as dirt. */
+  --shadow-lift: 0 18px 44px -22px rgba(16, 16, 21, 0.28);
+  --shadow-glow-sm: 0 0 18px -6px rgba(255, 107, 0, 0.35);
+  --shadow-glow: 0 0 40px -12px rgba(255, 107, 0, 0.4);
+}
+
+/* Brand surfaces keep white ink -----------------------------
+   A flame-filled button/badge must stay white-on-orange in both themes.
+   Re-declaring the variable inside the surface restores it for the element
+   and everything nested in it. */
+:root[data-theme='light'] .bg-flame-400,
+:root[data-theme='light'] .bg-flame-500,
+:root[data-theme='light'] .bg-flame-600,
+:root[data-theme='light'] .bg-flame-700 {
+  --color-white: #ffffff;
+  color: #ffffff;
+}
+
+/* Orange text on a light page needs a darker step to stay legible. */
+:root[data-theme='light'] .text-flame-400,
+:root[data-theme='light'] .text-flame-500 {
+  color: var(--color-flame-700);
+}
+
+/* The gradient headline reads as washed-out on white without this. */
+:root[data-theme='light'] .text-flame {
+  background: linear-gradient(
+    120deg,
+    var(--color-ink-100) 0%,
+    var(--color-flame-600) 55%,
+    var(--color-flame-700) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+* {
+  border-color: var(--hairline);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: auto; /* Lenis owns scrolling */
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: clip;
+}
+
+/* Lenis */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+::selection {
+  background: var(--color-flame-500);
+  color: #fff;
+}
+
+/* Scrollbar ------------------------------------------------ */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--color-flame-600), var(--color-flame-800));
+  border-radius: 99px;
+  border: 3px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-flame-500);
+}
+
+/* Focus — visible, on-brand, never removed ---------------- */
+:focus-visible {
+  outline: 2px solid var(--color-flame-500);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ============================================================
+   Utilities
+   ============================================================ */
+
+/* NO backdrop-filter here, deliberately.
+   `.glass` is used on ~50 cards, table shells and admin panels. A
+   backdrop-filter forces the compositor to re-capture and re-blur the region
+   behind the element on every frame it moves, so fifty of them turn an
+   ordinary scroll into a repaint storm — that was the "site and admin panel
+   is so much lagging" problem, on the site and in the panel alike.
+
+   These cards sit on a flat page background, where a real blur samples an
+   almost-uniform colour and is invisible in the result. The gradient below
+   is what actually reads as glass. `.glass-strong` keeps the true filter
+   because its dozen users genuinely float over moving content. */
+@utility glass {
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.075) 0%,
+    rgba(255, 255, 255, 0.025) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+@utility glass-strong {
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.11) 0%,
+    rgba(255, 255, 255, 0.035) 100%
+  );
+  backdrop-filter: blur(34px) saturate(180%);
+  -webkit-backdrop-filter: blur(34px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+}
+
+/* Glass has to become an opaque-ish card on light, or content behind it
+   bleeds through and the "mismatched text background" problem appears. */
+:root[data-theme='light'] .glass {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(16, 16, 21, 0.09);
+  box-shadow: 0 1px 2px rgba(16, 16, 21, 0.04);
+}
+:root[data-theme='light'] .glass-strong {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(16, 16, 21, 0.12);
+  box-shadow: 0 8px 30px -18px rgba(16, 16, 21, 0.3);
+}
+
+@utility card-edge {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/* Chips and captions that sit ON TOP OF an image.
+   These must not follow the theme: a photograph is dark in both themes, so
+   inverting their ink turns light-on-dark into dark-on-dark. Pinning the
+   scrim and the ink here keeps them legible either way. */
+@utility on-media {
+  background-color: rgba(6, 6, 8, 0.78);
+  color: #f2f2f5;
+  --color-white: #ffffff;
+}
+/* Scoped under [data-theme] so it outranks the light-theme rule that darkens
+   flame text for white backgrounds — on a dark media scrim it must go
+   lighter, not darker. */
+:root[data-theme] .on-media .text-flame-400,
+:root[data-theme] .on-media.text-flame-400,
+:root[data-theme] .on-media .text-flame-500,
+:root[data-theme] .on-media.text-flame-500 {
+  color: var(--color-flame-300);
+}
+
+/* Full-screen media viewers and scrims laid over imagery. Always dark, in
+   both themes — a white lightbox behind a photograph is worse for viewing and
+   would flip its controls to dark-on-dark. */
+@utility media-backdrop {
+  background-color: rgba(5, 5, 6, 0.95);
+  color: #f2f2f5;
+  --color-white: #ffffff;
+  --color-ink-100: #e6e6ea;
+  --color-ink-200: #c9c9d1;
+  --color-ink-300: #adadb8;
+  --color-ink-400: #93939f;
+  --color-ink-500: #7e7e8c;
+}
+
+@utility media-scrim {
+  background-color: rgba(5, 5, 6, 0.35);
+}
+
+@utility text-flame {
+  background: linear-gradient(120deg, #fff 0%, var(--color-flame-300) 45%, var(--color-flame-500) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility text-balance-pretty {
+  text-wrap: balance;
+}
+
+/* Fine grain — kills banding on the large dark gradients */
+@utility grain {
+  position: relative;
+}
+.grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  z-index: 1;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ============================================================
+   Form controls — must not inherit the page's dark assumptions
+   ============================================================ */
+
+/* The dropdown list a <select> opens is drawn by the operating system, not
+   laid out by our CSS. It takes its background from the platform — white on
+   Windows — while each <option> inherits the colour of the control, which on
+   the dark theme is white. White on white: the list was invisible except for
+   whichever row happened to be hovered.
+
+   Setting both properties on `option` itself is the only thing that reaches
+   that popup. Done for both themes, unconditionally, so no control can be
+   left depending on the platform's default. */
+option,
+optgroup {
+  background-color: var(--color-ink-800);
+  color: var(--color-ink-100);
+}
+
+/* `color-scheme` is what makes the platform draw the popup's own chrome —
+   scrollbar, border, highlight — to match. Without it the rows are dark but
+   the frame around them stays light. */
+select,
+input,
+textarea {
+  color-scheme: inherit;
+}
+
+:root[data-theme='light'] select,
+:root[data-theme='light'] input,
+:root[data-theme='light'] textarea {
+  background-color: #ffffff;
+  color: var(--color-ink-100);
+  border-color: rgba(16, 16, 21, 0.16);
+}
+:root[data-theme='light'] option,
+:root[data-theme='light'] optgroup {
+  background-color: #ffffff;
+  color: var(--color-ink-100);
+}
+:root[data-theme='light'] input::placeholder,
+:root[data-theme='light'] textarea::placeholder {
+  color: var(--color-ink-500);
+}
+
+/* ============================================================
+   Keyframes
+   ============================================================ */
+
+@keyframes drs-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(1.5deg);
+  }
+}
+
+@keyframes drs-sheen {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(320%) skewX(-18deg);
+  }
+}
+
+@keyframes drs-gradient-pan {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes drs-pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+@keyframes drs-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-float {
+  animation: drs-float 7s ease-in-out infinite;
+}
+.animate-gradient-pan {
+  background-size: 220% 220%;
+  animation: drs-gradient-pan 9s ease infinite;
+}
+.animate-pulse-ring {
+  animation: drs-pulse-ring 2.4s var(--ease-out-expo) infinite;
+}
+
+/* Skeleton loading ---------------------------------------- */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+  border-radius: 8px;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
+  animation: drs-shimmer 1.6s infinite;
+}
+
+/* Liquid sheen for primary buttons ------------------------ */
+.sheen {
+  position: relative;
+  overflow: hidden;
+}
+.sheen::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: translateX(-120%) skewX(-18deg);
+  pointer-events: none;
+}
+.sheen:hover::before {
+  animation: drs-sheen 0.9s var(--ease-out-expo);
+}
+
+/* Hide the native cursor only where the custom one is active */
+.custom-cursor-active,
+.custom-cursor-active * {
+  cursor: none !important;
+}
+
+/* ============================================================
+   Accessibility — honour reduced motion everywhere
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .custom-cursor-active,
+  .custom-cursor-active * {
+    cursor: auto !important;
+  }
+}

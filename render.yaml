@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: drs-3d-world
+    runtime: node
+    plan: starter          # `free` also works — see the disk note below
+    region: singapore      # closest Render region to Bhubaneswar
+    branch: main
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+
+      # Generated once by Render and kept for the life of the service.
+      # Changing it signs everybody out.
+      - key: JWT_SECRET
+        generateValue: true
+
+      # Where the SQLite file lives. Must sit on the mounted disk below.
+      - key: DATA_DIR
+        value: /var/data
+
+      - key: SESSION_TIMEOUT_MINUTES
+        value: "60"
+      - key: REMEMBER_ME_DAYS
+        value: "30"
+
+      # Set this to your real domain once DNS is pointed, so canonical URLs,
+      # Open Graph tags and the sitemap are absolute and correct.
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+
+      # Password for the seeded demo accounts on first boot.
+      # Change it here BEFORE the first deploy, then sign in and reset it.
+      - key: SEED_PASSWORD
+        sync: false
+
+    # IMPORTANT: Render's free plan has no persistent disk. Without this disk,
+    # the SQLite file lives on ephemeral storage and is wiped on every deploy
+    # and restart — the app will re-seed itself and lose real orders, quotes and
+    # leads. Keep this disk (paid) for anything beyond a demo.
+    disk:
+      name: drs-data
+      mountPath: /var/data
+      sizeGB: 1

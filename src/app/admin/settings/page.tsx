@@ -1,0 +1,168 @@
+import { BrandingUploader } from '@/components/admin/BrandingUploader';
+import { EmailTester } from '@/components/admin/EmailTester';
+import { PageHeader } from '@/components/admin/Shell';
+import { SettingsForm, type SettingGroup } from '@/components/admin/SettingsForm';
+import { requirePermission } from '@/lib/auth/session';
+import { CURSOR_VARIANTS } from '@/lib/cursor';
+import { getSettings } from '@/lib/queries';
+
+export const metadata = { title: 'Settings' };
+
+const GROUPS: SettingGroup[] = [
+  {
+    title: 'Appearance',
+    description:
+      'The theme applies to every visitor and every page — it is a property of the site, not a per-visitor preference, so there is no theme switch in the public header.',
+    fields: [
+      {
+        key: 'site_theme',
+        label: 'Site theme',
+        type: 'select',
+        options: [
+          { value: 'dark', label: 'Dark' },
+          { value: 'light', label: 'Light' },
+        ],
+        hint: 'Also re-lights the 3D hero to match.',
+      },
+      {
+        key: 'site_cursor',
+        label: 'Mouse pointer',
+        type: 'select',
+        options: CURSOR_VARIANTS.map((v) => ({ value: v.id, label: v.label })),
+        hint:
+          'Applies to the site and this panel. ' +
+          CURSOR_VARIANTS.map((v) => `${v.label}: ${v.description}`).join(' · ') +
+          ' Custom pointers are shown on mouse-driven devices only, and never when the reader has asked for reduced motion.',
+      },
+    ],
+  },
+  {
+    title: 'Email',
+    description:
+      'Verification codes, order confirmations and password resets are sent from here. Until these are filled in, nothing is sent — sign-up and password reset will not work.',
+    fields: [
+      {
+        key: 'smtp_host',
+        label: 'SMTP server',
+        hint: 'On alwaysdata this is smtp-dr3dworld.alwaysdata.net. For Gmail it is smtp.gmail.com.',
+      },
+      { key: 'smtp_port', label: 'Port', type: 'number', hint: '587 for STARTTLS, 465 for TLS.' },
+      {
+        key: 'smtp_user',
+        label: 'Username',
+        hint: 'Usually the full mailbox address you are sending from.',
+      },
+      {
+        key: 'smtp_pass',
+        label: 'Password',
+        type: 'password',
+        hint:
+          'For Gmail this must be an App Password, not the account password. Stored on the server and never sent back to this page.',
+      },
+      { key: 'smtp_from_name', label: 'Sender name', hint: 'Shown as the sender in the inbox.' },
+      {
+        key: 'smtp_from_address',
+        label: 'Sender address',
+        hint: 'Most providers reject a sender that is not the mailbox above. Leave blank to use the username.',
+      },
+    ],
+  },
+  {
+    title: 'Identity',
+    description: 'Shown in the header, footer and browser tab.',
+    fields: [
+      { key: 'site_name', label: 'Site name' },
+      { key: 'site_tagline', label: 'Tagline' },
+      { key: 'site_slogan', label: 'Slogan', type: 'textarea' },
+    ],
+  },
+  {
+    title: 'Contact',
+    description: 'Used on the contact page, in the footer and in WhatsApp links.',
+    fields: [
+      { key: 'contact_phone', label: 'Phone number' },
+      { key: 'contact_email', label: 'Email address' },
+      { key: 'whatsapp_number', label: 'WhatsApp number', hint: 'With country code, no plus sign — e.g. 916371989465.' },
+      { key: 'address', label: 'Studio address', type: 'textarea' },
+    ],
+  },
+  {
+    title: 'Commerce',
+    description: 'Applied to orders and to every quote the calculator produces.',
+    fields: [
+      { key: 'currency', label: 'Currency code' },
+      { key: 'gst_percent', label: 'GST', type: 'number', suffix: '%' },
+      { key: 'free_delivery_above', label: 'Free delivery above', type: 'number', suffix: '₹' },
+    ],
+  },
+  {
+    title: 'Quote calculator',
+    description:
+      'These drive the instant quote page. Changing them re-prices every new quote immediately — existing saved quotes keep the figures they were created with.',
+    fields: [
+      { key: 'quote_machine_rate_per_hour', label: 'Machine rate', type: 'number', suffix: '₹/h' },
+      { key: 'quote_labour_rate_per_hour', label: 'Labour rate', type: 'number', suffix: '₹/h' },
+      { key: 'quote_electricity_rate_per_kwh', label: 'Electricity', type: 'number', suffix: '₹/kWh' },
+      { key: 'quote_printer_watts', label: 'Printer draw', type: 'number', suffix: 'W' },
+      { key: 'quote_profit_margin_percent', label: 'Margin', type: 'number', suffix: '%' },
+      { key: 'quote_setup_fee', label: 'Setup fee', type: 'number', suffix: '₹' },
+    ],
+  },
+  {
+    title: 'Security',
+    description: 'Session behaviour for everyone signing in.',
+    fields: [
+      {
+        key: 'session_timeout_minutes',
+        label: 'Session timeout',
+        type: 'number',
+        suffix: 'min',
+        hint: 'Applies to new sign-ins. Set the SESSION_TIMEOUT_MINUTES environment variable to change token lifetime itself.',
+      },
+      { key: 'remember_me_days', label: 'Remember me for', type: 'number', suffix: 'days' },
+    ],
+  },
+];
+
+/**
+ * The stored SMTP password must not be handed to the browser. A sentinel goes
+ * in its place; the form sends it back only if the administrator typed
+ * something new, so leaving the field alone keeps the stored value.
+ */
+const SECRET_KEYS = ['smtp_pass'] as const;
+const SECRET_PLACEHOLDER = '••••••••••••';
+
+export default async function AdminSettingsPage() {
+  await requirePermission('settings.edit');
+  const stored = getSettings();
+
+  const settings = { ...stored };
+  for (const key of SECRET_KEYS) {
+    if (settings[key]) settings[key] = SECRET_PLACEHOLDER;
+  }
+
+  const emailConfigured = Boolean(stored.smtp_host && stored.smtp_user && stored.smtp_pass);
+
+  return (
+    <>
+      <PageHeader
+        title="Settings"
+        subtitle="Appearance, studio details, pricing rates and session behaviour."
+      />
+
+      <div className="mb-5">
+        <BrandingUploader
+          logoUrl={settings.site_logo_url || null}
+          logoLightUrl={settings.site_logo_light_url || null}
+          faviconUrl={settings.site_favicon_url || null}
+        />
+      </div>
+
+      <SettingsForm groups={GROUPS} initial={settings} />
+
+      <div className="mt-5">
+        <EmailTester configured={emailConfigured} />
+      </div>
+    </>
+  );
+}
