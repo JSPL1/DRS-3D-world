@@ -46,6 +46,9 @@ const PURPOSE_PERMISSION: Record<string, Permission> = {
   'product-colour': 'products.edit',
   gallery: 'gallery.edit',
   testimonial: 'testimonials.edit',
+  banner: 'banners.edit',
+  video: 'videos.edit',
+  blog: 'blogs.edit',
 };
 
 export async function POST(req: Request) {

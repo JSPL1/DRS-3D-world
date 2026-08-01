@@ -451,7 +451,11 @@ export function getFaqs() {
   );
 }
 
-export function getSettings(): Record<string, string> {
+// Memoized per request: getBranding() already calls this once, and pages
+// that also need a setting directly (quote rates, hero playback, admin
+// settings) were each triggering a second identical table scan on the same
+// request. `cache()` collapses all of them into one.
+export const getSettings = cache((): Record<string, string> => {
   const rows = all<{ key: string; value: string | null }>(`SELECT key, value FROM settings`);
   return Object.fromEntries(rows.map((r) => [r.key, r.value ?? '']));
-}
+});

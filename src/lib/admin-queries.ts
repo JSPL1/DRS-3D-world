@@ -399,8 +399,10 @@ export function listAdminCoupons() {
     type: string;
     value: number;
     min_order: number;
+    max_discount: number | null;
     usage_limit: number | null;
     used_count: number;
+    starts_at: string | null;
     expires_at: string | null;
     is_active: number;
   }>(`SELECT * FROM coupons ORDER BY created_at DESC`);

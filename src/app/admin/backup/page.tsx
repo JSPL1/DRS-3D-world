@@ -67,7 +67,7 @@ export default async function AdminBackupPage() {
                 <AlertTriangle className="h-4 w-4" />
                 Restoring
               </p>
-              <p className="mt-2 text-[12.5px] leading-relaxed text-amber-200/85">
+              <p className="mt-2 text-[12.5px] leading-relaxed text-amber-200">
                 Restore is a deliberate, offline operation: stop the service, replace the file at{' '}
                 <code className="rounded bg-black/30 px-1.5 py-0.5 font-mono text-[11px]">{path}</code>{' '}
                 with your snapshot, remove any <code className="font-mono text-[11px]">-wal</code> and{' '}
