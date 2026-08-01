@@ -91,7 +91,7 @@ export function BuyBox({
       {/* Price */}
       <div>
         <div className="flex items-end gap-3">
-          <span className="font-display text-4xl font-bold tracking-tight text-white">
+          <span className="font-display text-4xl font-bold tracking-tight text-ink-100">
             {inr(unitPrice)}
           </span>
           {listPrice && listPrice > unitPrice && (
@@ -136,7 +136,7 @@ export function BuyBox({
                     'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flame-500',
                     active
                       ? 'border-flame-500 scale-105 shadow-glow-sm'
-                      : 'border-white/15 hover:border-white/35',
+                      : 'border-ink-700 hover:border-ink-500',
                   )}
                 >
                   <span
@@ -165,19 +165,19 @@ export function BuyBox({
       {/* Quantity */}
       <div>
         <span className="text-[13px] font-medium text-ink-200">Quantity</span>
-        <div className="mt-3 inline-flex items-center rounded-xl border border-white/12">
+        <div className="mt-3 inline-flex items-center rounded-xl border border-ink-700">
           <button
             type="button"
             onClick={() => setQuantity((q) => Math.max(1, q - 1))}
             disabled={quantity <= 1}
             aria-label="Decrease quantity"
-            className="flex h-11 w-11 items-center justify-center rounded-l-xl text-ink-300 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-40"
+            className="flex h-11 w-11 items-center justify-center rounded-l-xl text-ink-300 transition-colors hover:bg-ink-800 hover:text-ink-100 disabled:opacity-40"
           >
             <Minus className="h-4 w-4" />
           </button>
           <span
             aria-live="polite"
-            className="w-12 text-center font-mono text-[15px] tabular-nums text-white"
+            className="w-12 text-center font-mono text-[15px] tabular-nums text-ink-100"
           >
             {quantity}
           </span>
@@ -186,7 +186,7 @@ export function BuyBox({
             onClick={() => setQuantity((q) => Math.min(99, q + 1))}
             disabled={quantity >= 99}
             aria-label="Increase quantity"
-            className="flex h-11 w-11 items-center justify-center rounded-r-xl text-ink-300 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-40"
+            className="flex h-11 w-11 items-center justify-center rounded-r-xl text-ink-300 transition-colors hover:bg-ink-800 hover:text-ink-100 disabled:opacity-40"
           >
             <Plus className="h-4 w-4" />
           </button>

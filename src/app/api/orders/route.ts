@@ -16,6 +16,12 @@ const schema = z.object({
   address: z.string().trim().min(10, 'Please give a full delivery address.').max(600),
   notes: z.string().trim().max(2000).optional().or(z.literal('')),
   couponCode: z.string().trim().max(40).optional().or(z.literal('')),
+  giftWrap: z.boolean().optional(),
+  giftNote: z.string().trim().max(240).optional().or(z.literal('')),
+  shippingMethod: z.enum(['standard', 'express', 'priority']).optional(),
+  deliveryLat: z.number().min(-90).max(90).nullable().optional(),
+  deliveryLng: z.number().min(-180).max(180).nullable().optional(),
+  deliveryLandmark: z.string().trim().max(200).optional().or(z.literal('')),
   items: z
     .array(
       z.object({
@@ -71,7 +77,13 @@ export async function POST(req: Request) {
   );
   const gstPercent = Number(settings.gst_percent) || 18;
   const freeDeliveryAbove = Number(settings.free_delivery_above) || 10000;
-  const deliveryFee = 250;
+  const deliveryFee = Number(settings.shipping_standard_fee) || 250;
+  const expressFee = Number(settings.shipping_express_fee) || 600;
+  const priorityFee = Number(settings.shipping_priority_fee) || 1200;
+  const giftWrapFee = Number(settings.gift_wrap_fee) || 149;
+
+  const shippingMethod = input.shippingMethod ?? 'standard';
+  const giftWrap = Boolean(input.giftWrap);
 
   /* ---------- Price every line from the database ----------
      The browser sends product ids, colours and quantities only. Prices,
@@ -192,9 +204,13 @@ export async function POST(req: Request) {
   const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
   discount = round2(discount);
-  const taxable = round2(subtotal - discount);
+  const wrapFee = giftWrap ? giftWrapFee : 0;
+  const taxable = round2(subtotal - discount + wrapFee);
   const tax = round2((taxable * gstPercent) / 100);
-  const shipping = taxable >= freeDeliveryAbove ? 0 : deliveryFee;
+  const baseShipping = shippingMethod === 'express' ? expressFee
+    : shippingMethod === 'priority' ? priorityFee
+    : (subtotal - discount) >= freeDeliveryAbove ? 0 : deliveryFee;
+  const shipping = baseShipping;
   const total = round2(taxable + tax + shipping);
 
   /* ---------- Persist ---------- */
@@ -203,9 +219,15 @@ export async function POST(req: Request) {
   const insertOrder = db.prepare(`
     INSERT INTO orders (order_number, user_id, customer_name, customer_email, customer_phone,
                         shipping_address, subtotal, discount, tax, shipping, total, coupon_code,
-                        status, payment_status, payment_method, notes, placed_via)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', NULL, ?, 'website')
+                        status, payment_status, payment_method, notes, placed_via,
+                        gift_wrap, gift_wrap_fee, gift_note,
+                        delivery_lat, delivery_lng, delivery_landmark, shipping_method)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', NULL, ?, 'website',
+            ?, ?, ?, ?, ?, ?, ?)
   `);
+  const bumpLoyalty = db.prepare(
+    `UPDATE users SET loyalty_points = loyalty_points + ? WHERE id = ?`,
+  );
   const insertItem = db.prepare(`
     INSERT INTO order_items (order_id, product_id, product_name, sku, quantity, unit_price, total,
                              color_name, color_hex)
@@ -219,6 +241,9 @@ export async function POST(req: Request) {
       input.customerName, input.customerEmail, input.customerPhone,
       input.address, subtotal, discount, tax, shipping, total,
       appliedCoupon, input.notes || null,
+      giftWrap ? 1 : 0, wrapFee, giftWrap ? (input.giftNote || null) : null,
+      input.deliveryLat ?? null, input.deliveryLng ?? null,
+      input.deliveryLandmark || null, shippingMethod,
     );
     const id = Number(result.lastInsertRowid);
 
@@ -230,6 +255,10 @@ export async function POST(req: Request) {
       );
     }
     if (appliedCoupon) bumpCoupon.run(appliedCoupon);
+
+    // 1 loyalty point per ₹100 of the order total — awarded on placement,
+    // same as every "earn on purchase" scheme; nothing to redeem against yet.
+    bumpLoyalty.run(Math.floor(total / 100), user.id);
 
     db.prepare(
       `INSERT INTO notifications (title, body, type, href) VALUES (?, ?, 'order', '/admin/orders')`,
@@ -256,8 +285,10 @@ export async function POST(req: Request) {
       '',
       `Subtotal ₹${subtotal.toFixed(0)}`,
       appliedCoupon ? `Discount (${appliedCoupon}) −₹${discount.toFixed(0)}` : '',
+      giftWrap ? `Gift wrap ₹${wrapFee.toFixed(0)}${input.giftNote ? ` — note: "${input.giftNote}"` : ''}` : '',
       `GST ₹${tax.toFixed(0)}`,
-      `Delivery ₹${shipping.toFixed(0)}`,
+      `Delivery (${shippingMethod}) ₹${shipping.toFixed(0)}`,
+      input.deliveryLat != null ? `Pinned location: ${input.deliveryLat}, ${input.deliveryLng}` : '',
       `TOTAL ₹${total.toFixed(0)}`,
       '',
       'Payment is not yet collected online — contact the customer to arrange it.',
@@ -270,6 +301,6 @@ export async function POST(req: Request) {
     ok: true,
     orderNumber,
     orderId,
-    totals: { subtotal, discount, tax, shipping, total },
+    totals: { subtotal, discount, giftWrapFee: wrapFee, tax, shipping, total },
   });
 }

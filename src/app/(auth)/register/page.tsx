@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
 import { getCurrentUser } from '@/lib/auth/session';
+import { getSettings } from '@/lib/queries';
 
 import { RegisterForm } from './RegisterForm';
 
@@ -23,6 +24,7 @@ export default async function RegisterPage({
   if (await getCurrentUser()) redirect('/account');
 
   const params = await searchParams;
+  const settings = getSettings();
 
   return (
     <RegisterForm
@@ -31,6 +33,7 @@ export default async function RegisterPage({
       defaultEmail={str(params.email) ?? ''}
       defaultPhone={str(params.phone) ?? ''}
       fromOrder={str(params.order)}
+      googleEnabled={Boolean(settings.oauth_google_client_id)}
     />
   );
 }

@@ -5,21 +5,35 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { OAuthButtons } from '@/components/auth/OAuthButtons';
 import { Button } from '@/components/ui/Button';
 import { Field, FormError, FormNotice } from '@/components/ui/Field';
+
+const OAUTH_ERRORS: Record<string, string> = {
+  google_not_configured: 'Google sign-in is not switched on for this site yet.',
+  google_failed: 'Google sign-in did not complete. Please try again.',
+  google_state_mismatch: 'That sign-in link expired. Please try again.',
+  google_account_inactive: 'This account is not active. Please contact the administrator.',
+};
 
 export function LoginForm({
   nextPath,
   justReset,
+  oauthError,
+  googleEnabled = false,
 }: {
   nextPath?: string;
   justReset?: boolean;
+  oauthError?: string;
+  googleEnabled?: boolean;
 }) {
   const router = useRouter();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    oauthError ? OAUTH_ERRORS[oauthError] ?? 'Sign-in did not complete.' : null,
+  );
   const [pending, setPending] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
@@ -123,6 +137,16 @@ export function LoginForm({
           {!pending && <ArrowRight className="h-4 w-4" />}
         </Button>
       </form>
+
+      <div className="mt-6 flex items-center gap-3">
+        <span className="h-px flex-1 bg-ink-800" />
+        <span className="text-[11px] uppercase tracking-[0.14em] text-ink-500">or</span>
+        <span className="h-px flex-1 bg-ink-800" />
+      </div>
+
+      <div className="mt-6">
+        <OAuthButtons googleEnabled={googleEnabled} facebookEnabled={false} next={nextPath} />
+      </div>
 
       <p className="mt-8 border-t border-white/5 pt-6 text-center text-[13px] text-ink-400">
         New here?{' '}

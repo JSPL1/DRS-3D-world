@@ -33,20 +33,29 @@ type CartContextValue = {
   count: number;
   subtotal: number;
   ready: boolean;
+  giftWrap: boolean;
+  giftNote: string;
+  giftWrapFee: number;
   add: (line: Omit<CartLine, 'quantity'>, quantity?: number) => void;
   setQuantity: (productId: number, colorId: number | null, quantity: number) => void;
   remove: (productId: number, colorId: number | null) => void;
   clear: () => void;
+  setGiftWrap: (value: boolean) => void;
+  setGiftNote: (value: string) => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
 const STORAGE_KEY = 'drs-cart-v1';
+const GIFT_KEY = 'drs-cart-gift-v1';
+export const GIFT_WRAP_FEE = 149;
 
 const sameLine = (a: CartLine, productId: number, colorId: number | null) =>
   a.productId === productId && (a.colorId ?? null) === (colorId ?? null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [lines, setLines] = useState<CartLine[]>([]);
+  const [giftWrap, setGiftWrap] = useState(false);
+  const [giftNote, setGiftNote] = useState('');
   // Rendering the basket before localStorage is read would flash an empty
   // cart on every navigation, so consumers wait on this.
   const [ready, setReady] = useState(false);
@@ -57,6 +66,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) setLines(parsed.filter(isValidLine));
+      }
+      const rawGift = localStorage.getItem(GIFT_KEY);
+      if (rawGift) {
+        const parsed = JSON.parse(rawGift);
+        if (typeof parsed?.giftWrap === 'boolean') setGiftWrap(parsed.giftWrap);
+        if (typeof parsed?.giftNote === 'string') setGiftNote(parsed.giftNote);
       }
     } catch {
       // Corrupt storage shouldn't break the site — start with an empty cart.
@@ -72,6 +87,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       // Quota or private mode — the cart still works for this page view.
     }
   }, [lines, ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    try {
+      localStorage.setItem(GIFT_KEY, JSON.stringify({ giftWrap, giftNote }));
+    } catch {
+      // Quota or private mode — gift wrap choice just won't persist across reloads.
+    }
+  }, [giftWrap, giftNote, ready]);
 
   // Keep multiple open tabs consistent.
   useEffect(() => {
@@ -119,13 +143,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setLines((current) => current.filter((l) => !sameLine(l, productId, colorId)));
   }, []);
 
-  const clear = useCallback(() => setLines([]), []);
+  const clear = useCallback(() => {
+    setLines([]);
+    setGiftWrap(false);
+    setGiftNote('');
+  }, []);
 
   const value = useMemo<CartContextValue>(() => {
     const count = lines.reduce((n, l) => n + l.quantity, 0);
     const subtotal = lines.reduce((n, l) => n + l.unitPrice * l.quantity, 0);
-    return { lines, count, subtotal, ready, add, setQuantity, remove, clear };
-  }, [lines, ready, add, setQuantity, remove, clear]);
+    return {
+      lines, count, subtotal, ready, add, setQuantity, remove, clear,
+      giftWrap, giftNote, giftWrapFee: GIFT_WRAP_FEE, setGiftWrap, setGiftNote,
+    };
+  }, [lines, ready, add, setQuantity, remove, clear, giftWrap, giftNote]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

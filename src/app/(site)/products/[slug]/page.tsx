@@ -9,6 +9,8 @@ import { notFound } from 'next/navigation';
 import { ProductPurchasePanel } from '@/components/products/ProductPurchasePanel';
 import { ProductCard } from '@/components/sections/ProductCard';
 import { RevealGroup, RevealItem } from '@/components/ui/Reveal';
+import { getCurrentUser } from '@/lib/auth/session';
+import { all } from '@/lib/db';
 import {
   getAllProductSlugs, getProductBySlug, getProductColors, getProductImages,
   getProductReviews, getRelatedProducts,
@@ -57,6 +59,14 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const reviews = getProductReviews(product.id);
   const colors = getProductColors(product.id);
 
+  const user = await getCurrentUser();
+  const wishlisted = user
+    ? new Set(
+        all<{ product_id: number }>(`SELECT product_id FROM wishlists WHERE user_id = ?`, [user.id])
+          .map((r) => r.product_id),
+      )
+    : new Set<number>();
+
   const specs = [
     { icon: Ruler, label: 'Dimensions', value: product.length_mm ? `${product.length_mm} × ${product.width_mm} × ${product.height_mm} mm` : null },
     { icon: Weight, label: 'Weight', value: product.weight_g ? `${product.weight_g} g` : null },
@@ -102,15 +112,15 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
       <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="mb-8 flex items-center gap-2 text-[13px] text-ink-400">
-          <Link href="/" className="transition-colors hover:text-white">Home</Link>
-          <span className="text-ink-500">/</span>
-          <Link href="/products" className="transition-colors hover:text-white">Products</Link>
+          <Link href="/" className="transition-colors hover:text-ink-100">Home</Link>
+          <span className="text-ink-600">/</span>
+          <Link href="/products" className="transition-colors hover:text-ink-100">Products</Link>
           {product.category_slug && (
             <>
-              <span className="text-ink-500">/</span>
+              <span className="text-ink-600">/</span>
               <Link
                 href={`/products?category=${product.category_slug}`}
-                className="transition-colors hover:text-white"
+                className="transition-colors hover:text-ink-100"
               >
                 {product.category_name}
               </Link>
@@ -122,12 +132,12 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             first on mobile, before the gallery pushes everything down. */}
         <div className="mb-8">
           <div className="flex flex-wrap items-center gap-2.5">
-            {product.is_best_seller && (
+            {Boolean(product.is_best_seller) && (
               <span className="rounded-full bg-flame-700 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
                 Best seller
               </span>
             )}
-            {product.is_new_arrival && (
+            {Boolean(product.is_new_arrival) && (
               <span className="rounded-full border border-flame-500/40 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-flame-500">
                 New
               </span>
@@ -190,13 +200,13 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         />
 
         {/* Reassurance strip — the questions every shopper has before paying */}
-        <div className="mt-10 grid gap-px overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.06] sm:grid-cols-3">
+        <div className="mt-10 grid gap-px overflow-hidden rounded-2xl border border-ink-800 bg-ink-800 sm:grid-cols-3">
           {[
             { icon: Truck, title: 'Free delivery over ₹10,000', body: 'Across India. Local delivery in Bhubaneswar.' },
             { icon: ShieldCheck, title: 'Printed to order', body: 'We confirm colour and finish before printing.' },
             { icon: RotateCcw, title: 'Reprint on defects', body: 'If it arrives flawed, we print it again.' },
           ].map((item) => (
-            <div key={item.title} className="flex items-start gap-3 bg-ink-950 p-5">
+            <div key={item.title} className="flex items-start gap-3 bg-[var(--surface)] p-5">
               <item.icon className="mt-0.5 h-5 w-5 shrink-0 text-flame-500" />
               <div>
                 <p className="text-[13.5px] font-semibold">{item.title}</p>
@@ -211,9 +221,9 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           {specs.length > 0 && (
             <div>
               <h2 className="font-display text-lg font-semibold tracking-tight">At a glance</h2>
-              <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.06]">
+              <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-ink-800 bg-ink-800">
                 {specs.map((spec) => (
-                  <div key={spec.label} className="bg-ink-950 p-4">
+                  <div key={spec.label} className="bg-[var(--surface)] p-4">
                     <dt className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-ink-500">
                       <spec.icon className="h-3.5 w-3.5" />
                       {spec.label}
@@ -262,11 +272,11 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           {product.specifications.length > 0 && (
             <div>
               <h2 className="font-display text-2xl font-bold tracking-tight">Specifications</h2>
-              <dl className="mt-5 divide-y divide-white/5">
+              <dl className="mt-5 divide-y divide-ink-800">
                 {product.specifications.map((spec) => (
                   <div key={spec.label} className="flex justify-between gap-4 py-3.5">
                     <dt className="text-[13.5px] text-ink-400">{spec.label}</dt>
-                    <dd className="text-right text-[13.5px] font-medium text-white">{spec.value}</dd>
+                    <dd className="text-right text-[13.5px] font-medium text-ink-100">{spec.value}</dd>
                   </div>
                 ))}
               </dl>
@@ -312,7 +322,11 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             <RevealGroup className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {related.map((item) => (
                 <RevealItem key={item.id}>
-                  <ProductCard product={item} />
+                  <ProductCard
+                    product={item}
+                    wishlisted={wishlisted.has(item.id)}
+                    signedIn={Boolean(user)}
+                  />
                 </RevealItem>
               ))}
             </RevealGroup>

@@ -1,15 +1,18 @@
 import { CartProvider } from '@/components/cart/CartProvider';
 import { Footer } from '@/components/layout/Footer';
+import { MobileTabBar } from '@/components/layout/MobileTabBar';
 import { Navbar } from '@/components/layout/Navbar';
 import { SmoothScroll } from '@/components/providers/SmoothScroll';
 import { Cursor } from '@/components/ui/Cursor';
 import { canAccessAdmin } from '@/lib/auth/roles';
 import { getCurrentUser } from '@/lib/auth/session';
 import { getBranding } from '@/lib/branding';
+import { getCategories } from '@/lib/queries';
 import { site } from '@/lib/site';
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const branding = getBranding();
+  const categories = getCategories();
 
   // Resolved on the server so the header is correct in the first response —
   // reading it on the client would flash "Sign in" at someone who is signed
@@ -64,9 +67,11 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
         logoUrl={branding.headerLogoUrl}
         logoOnDarkChip={branding.logoNeedsDarkChip}
         user={user}
+        categories={categories.map((c) => ({ name: c.name, slug: c.slug, count: c.product_count }))}
       />
-      <main id="main">{children}</main>
+      <main id="main" className="pb-16 sm:pb-0">{children}</main>
       <Footer logoUrl={branding.headerLogoUrl} logoOnDarkChip={branding.logoNeedsDarkChip} />
+      <MobileTabBar signedIn={Boolean(user)} />
     </SmoothScroll>
     </CartProvider>
   );

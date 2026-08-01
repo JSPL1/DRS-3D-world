@@ -1,6 +1,9 @@
 'use client';
 
-import { CheckCircle2, CreditCard, Lock, ShieldCheck } from 'lucide-react';
+import {
+  Banknote, Building2, CheckCircle2, CreditCard, Gift, Landmark, Loader2, Lock, MapPin,
+  QrCode, Rocket, ShieldCheck, Truck, Zap,
+} from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -8,11 +11,36 @@ import { useState } from 'react';
 
 import { useCart } from '@/components/cart/CartProvider';
 import { inr } from '@/components/products/BuyBox';
-import { Field, FormError } from '@/components/ui/Field';
+import { Field, FormError, FormNotice } from '@/components/ui/Field';
 
 const GST_RATE = 0.18;
 const FREE_DELIVERY_ABOVE = 10000;
-const DELIVERY_FEE = 250;
+
+const SHIPPING_TIERS = [
+  { id: 'standard', label: 'Standard', days: '5-7 working days', fee: 250, icon: Truck },
+  { id: 'express', label: 'Express', days: '2-3 working days', fee: 600, icon: Zap },
+  { id: 'priority', label: 'Priority', days: 'Next working day', fee: 1200, icon: Rocket },
+] as const;
+
+type ShippingId = (typeof SHIPPING_TIERS)[number]['id'];
+
+const PAYMENT_METHODS = [
+  { id: 'upi', label: 'UPI', icon: QrCode },
+  { id: 'card', label: 'Cards', icon: CreditCard },
+  { id: 'netbanking', label: 'Net banking', icon: Landmark },
+  { id: 'cod', label: 'Cash on delivery', icon: Banknote },
+] as const;
+
+/** Slippy-map tile containing a point, at a fixed zoom — no API key needed. */
+function tileFor(lat: number, lng: number, zoom = 15) {
+  const n = 2 ** zoom;
+  const x = Math.floor(((lng + 180) / 360) * n);
+  const latRad = (lat * Math.PI) / 180;
+  const y = Math.floor(
+    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n,
+  );
+  return { x, y, zoom };
+}
 
 export function CheckoutForm({
   defaultName,
@@ -22,7 +50,7 @@ export function CheckoutForm({
   defaultEmail: string;
 }) {
   const router = useRouter();
-  const { lines, subtotal, ready, clear } = useCart();
+  const { lines, subtotal, ready, giftWrap, giftNote, giftWrapFee, clear } = useCart();
 
   const [form, setForm] = useState({
     customerName: defaultName,
@@ -32,6 +60,14 @@ export function CheckoutForm({
     notes: '',
     couponCode: '',
   });
+  const [shippingMethod, setShippingMethod] = useState<ShippingId>('standard');
+  const [paymentMethod, setPaymentMethod] = useState<(typeof PAYMENT_METHODS)[number]['id']>('upi');
+
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
+  const [landmark, setLandmark] = useState('');
+
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [placed, setPlaced] = useState<{ orderNumber: string; total: number } | null>(null);
@@ -43,9 +79,31 @@ export function CheckoutForm({
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  const gst = subtotal * GST_RATE;
-  const delivery = subtotal >= FREE_DELIVERY_ABOVE ? 0 : DELIVERY_FEE;
-  const total = subtotal + gst + delivery;
+  const tier = SHIPPING_TIERS.find((t) => t.id === shippingMethod) ?? SHIPPING_TIERS[0];
+  const wrapFee = giftWrap ? giftWrapFee : 0;
+  const gst = (subtotal + wrapFee) * GST_RATE;
+  const delivery = shippingMethod === 'standard' && subtotal >= FREE_DELIVERY_ABOVE ? 0 : tier.fee;
+  const total = subtotal + wrapFee + gst + delivery;
+
+  function pinLocation() {
+    if (!navigator.geolocation) {
+      setLocationError('Your browser does not support location. Add a landmark instead.');
+      return;
+    }
+    setLocating(true);
+    setLocationError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setPin({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setLocating(false);
+      },
+      () => {
+        setLocationError('Could not get your location. You can still add a landmark below.');
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -59,6 +117,12 @@ export function CheckoutForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          giftWrap,
+          giftNote,
+          shippingMethod,
+          deliveryLat: pin?.lat ?? null,
+          deliveryLng: pin?.lng ?? null,
+          deliveryLandmark: landmark,
           items: lines.map((l) => ({
             productId: l.productId,
             colorId: l.colorId,
@@ -108,7 +172,7 @@ export function CheckoutForm({
           </Link>
           <Link
             href="/account"
-            className="glass inline-flex h-12 items-center justify-center rounded-xl px-6 text-sm font-medium transition-colors hover:bg-white/10"
+            className="glass inline-flex h-12 items-center justify-center rounded-xl px-6 text-sm font-medium transition-colors hover:border-ink-600"
           >
             View your orders
           </Link>
@@ -176,9 +240,57 @@ export function CheckoutForm({
               value={form.address}
               onChange={set('address')}
               placeholder="House / flat, street, area, city, state, PIN code"
-              className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3.5 text-[14.5px] leading-relaxed placeholder:text-ink-500 transition-all focus:border-flame-500/60 focus:outline-none focus:ring-4 focus:ring-flame-500/10"
+              className="rounded-xl border border-ink-700 bg-[var(--surface-sunken)] px-4 py-3.5 text-[14.5px] leading-relaxed text-ink-100 placeholder:text-ink-600 transition-all focus:border-flame-500/60 focus:outline-none focus:ring-4 focus:ring-flame-500/10"
             />
           </label>
+
+          {/* GPS pin */}
+          <div className="mt-5 rounded-xl border border-ink-800 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-[13px] font-medium text-ink-200">
+                <MapPin className="h-4 w-4 text-flame-500" />
+                Pin your exact location
+                <span className="text-ink-500">(optional)</span>
+              </span>
+              <button
+                type="button"
+                onClick={pinLocation}
+                disabled={locating}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-ink-700 px-3 text-[12px] font-semibold text-ink-200 transition-colors hover:border-flame-500/50 hover:text-flame-500 disabled:opacity-50"
+              >
+                {locating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MapPin className="h-3.5 w-3.5" />}
+                {locating ? 'Locating…' : pin ? 'Update pin' : 'Use my location'}
+              </button>
+            </div>
+
+            {locationError && <p className="mt-2 text-[12px] text-red-400">{locationError}</p>}
+
+            {pin && (
+              <div className="mt-3 overflow-hidden rounded-lg border border-ink-800">
+                <div className="relative h-36 w-full bg-ink-900">
+                  <Image
+                    src={`https://tile.openstreetmap.org/${tileFor(pin.lat, pin.lng).zoom}/${tileFor(pin.lat, pin.lng).x}/${tileFor(pin.lat, pin.lng).y}.png`}
+                    alt="Map preview of your pinned location"
+                    fill
+                    unoptimized
+                    className="object-cover"
+                  />
+                  <span className="pointer-events-none absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-flame-600 shadow-[0_0_0_4px_rgba(255,106,0,0.35)]" />
+                </div>
+                <p className="bg-[var(--surface)] px-3 py-2 font-mono text-[11px] text-ink-500">
+                  {pin.lat.toFixed(5)}, {pin.lng.toFixed(5)}
+                </p>
+              </div>
+            )}
+
+            <Field
+              label="Nearest landmark"
+              className="mt-3"
+              value={landmark}
+              onChange={(e) => setLandmark(e.target.value)}
+              placeholder="e.g. Opposite City Mall"
+            />
+          </div>
 
           <label className="mt-5 flex flex-col gap-2">
             <span className="text-[13px] font-medium text-ink-200">
@@ -189,20 +301,78 @@ export function CheckoutForm({
               value={form.notes}
               onChange={set('notes')}
               placeholder="Engraving text, deadline, finish preference…"
-              className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3.5 text-[14.5px] leading-relaxed placeholder:text-ink-500 transition-all focus:border-flame-500/60 focus:outline-none focus:ring-4 focus:ring-flame-500/10"
+              className="rounded-xl border border-ink-700 bg-[var(--surface-sunken)] px-4 py-3.5 text-[14.5px] leading-relaxed text-ink-100 placeholder:text-ink-600 transition-all focus:border-flame-500/60 focus:outline-none focus:ring-4 focus:ring-flame-500/10"
             />
           </label>
         </section>
 
+        {/* Shipping speed */}
+        <section className="glass rounded-2xl p-6 sm:p-7">
+          <h2 className="flex items-center gap-2.5 font-display text-lg font-semibold tracking-tight">
+            <Truck className="h-4.5 w-4.5 text-flame-500" />
+            Shipping speed
+          </h2>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            {SHIPPING_TIERS.map((option) => {
+              const active = shippingMethod === option.id;
+              const free = option.id === 'standard' && subtotal >= FREE_DELIVERY_ABOVE;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setShippingMethod(option.id)}
+                  aria-pressed={active}
+                  className={`flex flex-col items-start gap-2 rounded-xl border-2 p-4 text-left transition-all duration-200 ${
+                    active
+                      ? 'border-flame-500 bg-flame-500/[0.06]'
+                      : 'border-ink-800 hover:border-ink-600'
+                  }`}
+                >
+                  <option.icon className={`h-5 w-5 ${active ? 'text-flame-500' : 'text-ink-400'}`} />
+                  <span className="text-[13.5px] font-semibold">{option.label}</span>
+                  <span className="text-[11.5px] text-ink-500">{option.days}</span>
+                  <span className="font-mono text-[13px] font-semibold text-flame-600">
+                    {free ? 'Free' : inr(option.fee)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Payment */}
         <section className="glass rounded-2xl p-6 sm:p-7">
           <h2 className="flex items-center gap-2.5 font-display text-lg font-semibold tracking-tight">
             <CreditCard className="h-4.5 w-4.5 text-flame-500" />
             Payment
           </h2>
-          <p className="mt-3 rounded-xl border border-flame-600/25 bg-flame-700/[0.08] px-4 py-3.5 text-[13px] leading-relaxed text-flame-500">
-            Online payment is not switched on yet. Place the order and we will call you to arrange
-            UPI or bank transfer — nothing is charged now.
-          </p>
+
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {PAYMENT_METHODS.map((method) => {
+              const active = paymentMethod === method.id;
+              return (
+                <button
+                  key={method.id}
+                  type="button"
+                  onClick={() => setPaymentMethod(method.id)}
+                  aria-pressed={active}
+                  className={`flex flex-col items-center gap-2 rounded-xl border-2 py-4 text-center transition-all duration-200 ${
+                    active
+                      ? 'border-flame-500 bg-flame-500/[0.06]'
+                      : 'border-ink-800 hover:border-ink-600'
+                  }`}
+                >
+                  <method.icon className={`h-5 w-5 ${active ? 'text-flame-500' : 'text-ink-400'}`} />
+                  <span className="text-[12px] font-semibold">{method.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-4">
+            <FormNotice message="Online payment is not switched on yet. Place the order and we will call you to arrange payment by your chosen method — nothing is charged now." />
+          </div>
         </section>
       </div>
 
@@ -210,7 +380,7 @@ export function CheckoutForm({
       <aside className="glass-strong rounded-2xl p-6 lg:sticky lg:top-28">
         <h2 className="font-display text-lg font-semibold tracking-tight">Your order</h2>
 
-        <ul className="mt-5 flex flex-col gap-3 border-b border-white/8 pb-5">
+        <ul className="mt-5 flex flex-col gap-3 border-b border-ink-800 pb-5">
           {lines.map((line) => (
             <li key={`${line.productId}-${line.colorId ?? 'none'}`} className="flex gap-3">
               <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-ink-900">
@@ -239,6 +409,13 @@ export function CheckoutForm({
               </span>
             </li>
           ))}
+
+          {giftWrap && (
+            <li className="flex items-center gap-2 text-[12.5px] text-flame-600">
+              <Gift className="h-3.5 w-3.5" />
+              Gift wrapped{giftNote ? ` — "${giftNote}"` : ''}
+            </li>
+          )}
         </ul>
 
         <Field
@@ -255,17 +432,23 @@ export function CheckoutForm({
             <dt className="text-ink-400">Subtotal</dt>
             <dd className="font-mono tabular-nums">{inr(subtotal)}</dd>
           </div>
+          {giftWrap && (
+            <div className="flex justify-between">
+              <dt className="text-ink-400">Gift wrap</dt>
+              <dd className="font-mono tabular-nums">{inr(wrapFee)}</dd>
+            </div>
+          )}
           <div className="flex justify-between">
             <dt className="text-ink-400">GST (18%)</dt>
             <dd className="font-mono tabular-nums">{inr(gst)}</dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-ink-400">Delivery</dt>
+            <dt className="text-ink-400">Delivery ({tier.label})</dt>
             <dd className="font-mono tabular-nums">
               {delivery === 0 ? <span className="text-emerald-400">Free</span> : inr(delivery)}
             </dd>
           </div>
-          <div className="flex justify-between border-t border-white/10 pt-4">
+          <div className="flex justify-between border-t border-ink-700 pt-4">
             <dt className="font-display text-base font-semibold">Total</dt>
             <dd className="font-display text-xl font-bold text-flame-500">{inr(total)}</dd>
           </div>

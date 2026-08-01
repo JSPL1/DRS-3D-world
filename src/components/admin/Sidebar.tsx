@@ -182,7 +182,7 @@ export function Sidebar({
       </button>
 
       {/* Desktop */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-white/5 bg-ink-900 lg:block">
+      <aside className="admin-sidebar fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-white/5 lg:block">
         {nav}
       </aside>
 
@@ -190,10 +190,10 @@ export function Sidebar({
       {open && (
         <>
           <div
-            className="fixed inset-0 z-40 bg-ink-950/80 backdrop-blur-sm lg:hidden"
+            className="fixed inset-0 z-40 bg-black/80 lg:hidden"
             onClick={() => setOpen(false)}
           />
-          <aside className="fixed inset-y-0 left-0 z-50 w-72 border-r border-white/5 bg-ink-900 lg:hidden">
+          <aside className="admin-sidebar fixed inset-y-0 left-0 z-50 w-72 border-r border-white/5 lg:hidden">
             {nav}
           </aside>
         </>

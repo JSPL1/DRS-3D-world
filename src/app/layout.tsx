@@ -1,19 +1,23 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Outfit } from 'next/font/google';
+import { Manrope, Plus_Jakarta_Sans } from 'next/font/google';
 
 import { getBranding } from '@/lib/branding';
 import { site } from '@/lib/site';
 import './globals.css';
 
-const inter = Inter({
+// Self-hosted at build time — next/font downloads and serves these from our
+// own origin, so there is no runtime request to fonts.googleapis.com (the
+// redesign source used a <link> tag, which costs a DNS lookup + connection +
+// download on every first visit, and a layout shift while it arrives).
+const manrope = Manrope({
   subsets: ['latin'],
-  variable: '--font-inter',
+  variable: '--font-manrope',
   display: 'swap',
 });
 
-const outfit = Outfit({
+const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
-  variable: '--font-outfit',
+  variable: '--font-jakarta',
   display: 'swap',
 });
 
@@ -76,7 +80,7 @@ export async function generateViewport(): Promise<Viewport> {
   const branding = getBranding();
 
   return {
-    themeColor: branding.theme === 'light' ? '#f6f6f8' : '#050506',
+    themeColor: branding.theme === 'light' ? '#f7f6f3' : '#0b0b0c',
     width: 'device-width',
     initialScale: 1,
     viewportFit: 'cover',
@@ -90,7 +94,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="en"
       data-theme={branding.theme}
-      className={`${inter.variable} ${outfit.variable}`}
+      className={`${manrope.variable} ${jakarta.variable}`}
     >
       <body className="grain min-h-dvh antialiased">{children}</body>
     </html>

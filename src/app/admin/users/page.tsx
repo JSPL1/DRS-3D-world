@@ -28,10 +28,10 @@ export default async function AdminUsersPage() {
       <PageHeader title="Users" subtitle={`${users.length} accounts across five roles`} />
 
       <Card className="mb-5">
-        <div className="grid gap-px bg-white/[0.06] sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-px bg-ink-800 sm:grid-cols-2 lg:grid-cols-5">
           {(Object.keys(ROLE_NOTES) as Role[]).map((role) => (
-            <div key={role} className="bg-ink-950 p-5">
-              <p className="text-[13px] font-semibold text-white">{ROLE_LABELS[role]}</p>
+            <div key={role} className="bg-[var(--surface)] p-5">
+              <p className="text-[13px] font-semibold text-ink-100">{ROLE_LABELS[role]}</p>
               <p className="mt-1.5 text-[12px] leading-relaxed text-ink-500">{ROLE_NOTES[role]}</p>
               <p className="mt-3 font-mono text-[11px] text-flame-500">
                 {users.filter((u) => u.role === role).length} account

@@ -119,14 +119,14 @@ export default async function AdminSeoPage() {
         <Link
           href="/sitemap.xml"
           target="_blank"
-          className="rounded-xl border border-white/10 px-4 py-2.5 text-[13px] text-ink-200 transition-colors hover:border-flame-500/40 hover:text-flame-400"
+          className="rounded-xl border border-ink-700 px-4 py-2.5 text-[13px] text-ink-200 transition-colors hover:border-flame-500/40 hover:text-flame-400"
         >
           View sitemap.xml
         </Link>
         <Link
           href="/robots.txt"
           target="_blank"
-          className="rounded-xl border border-white/10 px-4 py-2.5 text-[13px] text-ink-200 transition-colors hover:border-flame-500/40 hover:text-flame-400"
+          className="rounded-xl border border-ink-700 px-4 py-2.5 text-[13px] text-ink-200 transition-colors hover:border-flame-500/40 hover:text-flame-400"
         >
           View robots.txt
         </Link>

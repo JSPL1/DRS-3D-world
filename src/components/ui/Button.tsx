@@ -5,22 +5,43 @@ import { forwardRef, useRef, type ButtonHTMLAttributes } from 'react';
 
 import { cn } from '@/lib/cn';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'outline';
+/**
+ * Three-tier hierarchy, matching the redesign:
+ *  - `primary`   solid near-black — the default action on a screen
+ *  - `accent`    solid flame orange — reserved for the one action that moves
+ *                money or commits an order (Buy now, Pay, Checkout, Place order)
+ *  - `secondary` white card with a hairline border
+ *  - `outline`   transparent, border only
+ *  - `ghost`     text only
+ *
+ * `accent` fills with flame-700 rather than the brand's vivid flame-500:
+ * white text on #ff6a00 measures 2.87:1, under the 4.5:1 WCAG AA minimum,
+ * where #bf4a00 reaches 5.01:1. The bright orange stays for glow, borders,
+ * icons and text-on-dark, where it isn't carrying white text on itself.
+ */
+type Variant = 'primary' | 'accent' | 'secondary' | 'outline' | 'ghost';
 type Size = 'sm' | 'md' | 'lg';
 
 const VARIANTS: Record<Variant, string> = {
-  // flame-700 rather than the vivid flame-500: white text on #ff6b00 measures
-  // 2.86:1, below the 4.5:1 WCAG AA minimum, whereas #bf4a00 reaches 5.01:1.
-  // The bright brand orange is kept for glow, borders, icons and marks, where
-  // it isn't carrying text.
+  // ink-100 and ink-950 are each theme's two extremes and are always exact
+  // opposites of one another (near-black/near-white in light, the reverse in
+  // dark) — that pairing is what guarantees this button is never
+  // text-on-matching-background. `text-white` would not: it resolves to
+  // "primary ink", the same value as `ink-100` in every theme, which is
+  // this component's own background — invisible text on itself.
   primary:
+    'bg-ink-100 text-ink-950 hover:opacity-90 active:opacity-85 shadow-lift',
+  accent:
     'bg-flame-700 text-white shadow-glow-sm hover:bg-flame-800 hover:shadow-glow active:bg-flame-800',
   secondary:
-    'glass text-white hover:bg-white/10 hover:border-white/20',
+    'glass text-ink-100 hover:border-ink-600',
+  // text-flame-400 alone is correct in both themes: the existing light-theme
+  // override rule in globals.css already re-maps it to flame-700 for AA
+  // contrast on white, and flame-400 (8.4:1) is what dark needs unchanged.
   outline:
     'border border-flame-500/50 text-flame-400 hover:bg-flame-500/10 hover:border-flame-500',
   ghost:
-    'text-ink-200 hover:text-white hover:bg-white/5',
+    'text-ink-400 hover:text-ink-100 hover:bg-ink-850',
 };
 
 const SIZES: Record<Size, string> = {
@@ -30,7 +51,7 @@ const SIZES: Record<Size, string> = {
 };
 
 const BASE =
-  'sheen relative inline-flex select-none items-center justify-center font-medium tracking-tight ' +
+  'sheen relative inline-flex select-none items-center justify-center font-semibold tracking-tight ' +
   'transition-[background-color,border-color,box-shadow,transform] duration-300 ease-[var(--ease-out-expo)] ' +
   'disabled:pointer-events-none disabled:opacity-45 will-change-transform';
 

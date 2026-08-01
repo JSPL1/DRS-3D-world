@@ -109,6 +109,45 @@ const GROUPS: SettingGroup[] = [
     ],
   },
   {
+    title: 'Shipping & gift wrap',
+    description: 'Speed tiers offered at checkout, and the flat fee for the gift-wrap add-on.',
+    fields: [
+      { key: 'shipping_standard_fee', label: 'Standard fee', type: 'number', suffix: '₹' },
+      { key: 'shipping_standard_days', label: 'Standard timeframe' },
+      { key: 'shipping_express_fee', label: 'Express fee', type: 'number', suffix: '₹' },
+      { key: 'shipping_express_days', label: 'Express timeframe' },
+      { key: 'shipping_priority_fee', label: 'Priority fee', type: 'number', suffix: '₹' },
+      { key: 'shipping_priority_days', label: 'Priority timeframe' },
+      { key: 'gift_wrap_fee', label: 'Gift wrap fee', type: 'number', suffix: '₹' },
+    ],
+  },
+  {
+    title: 'Integrations',
+    description:
+      'Google sign-in, Razorpay payments and WhatsApp order updates are built and wired up, but stay switched off until real credentials are added here — nothing pretends to work before it does.',
+    fields: [
+      {
+        key: 'oauth_google_client_id',
+        label: 'Google OAuth client ID',
+        hint: 'From Google Cloud Console → APIs & Services → Credentials. Authorised redirect URI: ' +
+          '/api/auth/google/callback on this domain.',
+      },
+      { key: 'oauth_google_client_secret', label: 'Google OAuth client secret', type: 'password' },
+      {
+        key: 'razorpay_key_id',
+        label: 'Razorpay key ID',
+        hint: 'From the Razorpay dashboard, once the merchant account is KYC-verified.',
+      },
+      { key: 'razorpay_key_secret', label: 'Razorpay key secret', type: 'password' },
+      {
+        key: 'whatsapp_phone_id',
+        label: 'WhatsApp phone number ID',
+        hint: 'From Meta for Developers → WhatsApp → API Setup.',
+      },
+      { key: 'whatsapp_access_token', label: 'WhatsApp access token', type: 'password' },
+    ],
+  },
+  {
     title: 'Security',
     description: 'Session behaviour for everyone signing in.',
     fields: [
@@ -129,7 +168,9 @@ const GROUPS: SettingGroup[] = [
  * in its place; the form sends it back only if the administrator typed
  * something new, so leaving the field alone keeps the stored value.
  */
-const SECRET_KEYS = ['smtp_pass'] as const;
+const SECRET_KEYS = [
+  'smtp_pass', 'oauth_google_client_secret', 'razorpay_key_secret', 'whatsapp_access_token',
+] as const;
 const SECRET_PLACEHOLDER = '••••••••••••';
 
 export default async function AdminSettingsPage() {

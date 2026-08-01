@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 
+import { getSettings } from '@/lib/queries';
+
 import { LoginForm } from './LoginForm';
 
 export const metadata: Metadata = {
@@ -8,17 +10,22 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; reset?: string }>;
+  searchParams: Promise<{ next?: string; reset?: string; error?: string }>;
 }) {
   const params = await searchParams;
+  const settings = getSettings();
 
   return (
     <LoginForm
       nextPath={typeof params.next === 'string' ? params.next : undefined}
       justReset={params.reset === '1'}
+      oauthError={params.error}
+      googleEnabled={Boolean(settings.oauth_google_client_id)}
     />
   );
 }

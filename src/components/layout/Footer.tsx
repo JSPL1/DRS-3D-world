@@ -39,8 +39,9 @@ export function Footer({
   logoOnDarkChip?: boolean;
 }) {
   return (
-    <footer className="relative mt-24 overflow-hidden border-t border-white/5">
-      {/* Warm floor glow, echoing a heated bed */}
+    <footer className="relative mt-24 overflow-hidden border-t border-ink-800 bg-[var(--surface)]">
+      {/* Warm floor glow — static, not scroll-linked, so this one blur costs
+          nothing repeated (unlike the removed backdrop-filter cards). */}
       <div
         aria-hidden
         className="pointer-events-none absolute -top-32 left-1/2 h-64 w-[min(900px,90vw)] -translate-x-1/2 rounded-full bg-flame-500/10 blur-[120px]"
@@ -53,12 +54,12 @@ export function Footer({
               <Logo src={logoUrl} alt={site.name} className="h-14" onDarkChip={logoOnDarkChip} />
             ) : (
               <div className="flex items-center gap-3">
-                <LogoMark className="h-11 w-11 text-white" />
+                <LogoMark className="h-11 w-11 text-ink-100" />
                 <div>
                   <p className="font-display text-xl font-bold tracking-tight">
-                    DRS <span className="text-flame-500">3D</span> WORLD
+                    DRS <span className="text-flame-700">3D</span> WORLD
                   </p>
-                  <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-ink-400">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.32em] text-ink-500">
                     {site.tagline}
                   </p>
                 </div>
@@ -67,26 +68,26 @@ export function Footer({
 
             <p className="mt-5 font-display text-lg leading-snug text-ink-100">
               Bringing your ideas to life,{' '}
-              <span className="text-flame-500">one layer at a time.</span>
+              <span className="text-flame-700">one layer at a time.</span>
             </p>
 
-            <div className="mt-7 space-y-3 text-sm text-ink-300">
+            <div className="mt-7 space-y-3 text-sm text-ink-400">
               <a
                 href={`tel:${site.contact.phoneIntl}`}
-                className="flex items-center gap-3 transition-colors hover:text-white"
+                className="flex items-center gap-3 transition-colors hover:text-ink-100"
               >
-                <Phone className="h-4 w-4 shrink-0 text-flame-500" />
+                <Phone className="h-4 w-4 shrink-0 text-flame-600" />
                 {site.contact.phone}
               </a>
               <a
                 href={`mailto:${site.contact.email}`}
-                className="flex items-center gap-3 transition-colors hover:text-white"
+                className="flex items-center gap-3 transition-colors hover:text-ink-100"
               >
-                <Mail className="h-4 w-4 shrink-0 text-flame-500" />
+                <Mail className="h-4 w-4 shrink-0 text-flame-600" />
                 {site.contact.email}
               </a>
               <p className="flex items-start gap-3">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-flame-500" />
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-flame-600" />
                 <span>
                   {site.contact.address.line1}, {site.contact.address.line2}
                   <br />
@@ -101,7 +102,7 @@ export function Footer({
               href={whatsappLink('Hello DRS 3D WORLD, I would like to discuss a project.')}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-6 inline-flex items-center gap-2 rounded-xl border border-flame-500/30 bg-flame-500/10 px-4 py-2.5 text-sm font-medium text-flame-400 transition-colors hover:bg-flame-500/20"
+              className="mt-6 inline-flex items-center gap-2 rounded-xl border border-flame-500/30 bg-flame-500/10 px-4 py-2.5 text-sm font-semibold text-flame-700 transition-colors hover:bg-flame-500/15"
             >
               Chat on WhatsApp
             </a>
@@ -109,7 +110,7 @@ export function Footer({
 
           {COLUMNS.map((column) => (
             <div key={column.title}>
-              <h3 className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-400">
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-500">
                 {column.title}
               </h3>
               <ul className="mt-5 space-y-3">
@@ -117,9 +118,9 @@ export function Footer({
                   <li key={link.href + link.label}>
                     <Link
                       href={link.href}
-                      className="group inline-flex items-center gap-2 text-sm text-ink-300 transition-colors hover:text-white"
+                      className="group inline-flex items-center gap-2 text-sm text-ink-400 transition-colors hover:text-ink-100"
                     >
-                      <span className="h-px w-0 bg-flame-500 transition-all duration-300 group-hover:w-3" />
+                      <span className="h-px w-0 bg-flame-600 transition-all duration-300 group-hover:w-3" />
                       {link.label}
                     </Link>
                   </li>
@@ -129,7 +130,7 @@ export function Footer({
           ))}
         </div>
 
-        <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-white/5 pt-8 text-xs text-ink-400 sm:flex-row">
+        <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-ink-800 pt-8 text-xs text-ink-500 sm:flex-row">
           <p>
             © {new Date().getFullYear()} {site.legalName}. All rights reserved.
           </p>

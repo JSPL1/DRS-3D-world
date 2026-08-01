@@ -51,9 +51,9 @@ export function StatusSelect({
       aria-label="Change status"
       className={cn(
         'h-8 rounded-lg border px-2.5 text-[12px] capitalize transition-colors',
-        'bg-ink-900 text-ink-100',
+        'bg-[var(--surface-sunken)] text-ink-100',
         'focus:border-flame-500/60 focus:outline-none disabled:opacity-60',
-        failed ? 'border-red-500/60' : 'border-white/15',
+        failed ? 'border-red-500/60' : 'border-ink-700',
         className,
       )}
     >

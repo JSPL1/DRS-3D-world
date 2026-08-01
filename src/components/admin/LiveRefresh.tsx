@@ -82,7 +82,7 @@ export function LiveRefresh({
   return (
     <div
       role="status"
-      className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-[12.5px] font-medium text-emerald-400 shadow-lift backdrop-blur-sm"
+      className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-emerald-500/30 bg-[var(--surface)] px-4 py-2 text-[12.5px] font-medium text-emerald-400 shadow-lift"
     >
       Updated just now
     </div>

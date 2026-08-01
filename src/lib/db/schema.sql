@@ -498,3 +498,14 @@ CREATE TABLE IF NOT EXISTS media (
   uploaded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+
+-- ---------- Redesign additions ------------------------------
+-- The heart icon on a product card. One row per (customer, product); the
+-- unique index is what makes "toggle" idempotent from the API.
+CREATE TABLE IF NOT EXISTS wishlists (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_wishlists_user_product ON wishlists(user_id, product_id);

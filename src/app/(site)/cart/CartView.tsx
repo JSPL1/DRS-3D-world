@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react';
+import { ArrowRight, Gift, Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -12,7 +12,10 @@ const FREE_DELIVERY_ABOVE = 10000;
 const DELIVERY_FEE = 250;
 
 export function CartView({ signedIn = false }: { signedIn?: boolean }) {
-  const { lines, subtotal, count, ready, setQuantity, remove } = useCart();
+  const {
+    lines, subtotal, count, ready, setQuantity, remove,
+    giftWrap, giftNote, giftWrapFee, setGiftWrap, setGiftNote,
+  } = useCart();
 
   if (!ready) {
     return (
@@ -46,7 +49,7 @@ export function CartView({ signedIn = false }: { signedIn?: boolean }) {
           </Link>
           <Link
             href="/quote"
-            className="glass inline-flex h-12 items-center justify-center rounded-xl px-6 text-sm font-medium transition-colors hover:bg-white/10"
+            className="glass inline-flex h-12 items-center justify-center rounded-xl px-6 text-sm font-medium transition-colors hover:border-ink-600"
           >
             Price your own file
           </Link>
@@ -56,9 +59,10 @@ export function CartView({ signedIn = false }: { signedIn?: boolean }) {
   }
 
   // Shown for reassurance only — the server recomputes all of this at checkout.
-  const gst = subtotal * GST_RATE;
+  const wrapFee = giftWrap ? giftWrapFee : 0;
+  const gst = (subtotal + wrapFee) * GST_RATE;
   const delivery = subtotal >= FREE_DELIVERY_ABOVE ? 0 : DELIVERY_FEE;
-  const total = subtotal + gst + delivery;
+  const total = subtotal + wrapFee + gst + delivery;
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_360px] lg:items-start">
@@ -110,12 +114,12 @@ export function CartView({ signedIn = false }: { signedIn?: boolean }) {
               </div>
 
               <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-3">
-                <div className="inline-flex items-center rounded-lg border border-white/12">
+                <div className="inline-flex items-center rounded-lg border border-ink-700">
                   <button
                     type="button"
                     onClick={() => setQuantity(line.productId, line.colorId, line.quantity - 1)}
                     aria-label="Decrease quantity"
-                    className="flex h-9 w-9 items-center justify-center rounded-l-lg text-ink-300 transition-colors hover:bg-white/5 hover:text-white"
+                    className="flex h-9 w-9 items-center justify-center rounded-l-lg text-ink-300 transition-colors hover:bg-ink-800 hover:text-ink-100"
                   >
                     <Minus className="h-3.5 w-3.5" />
                   </button>
@@ -126,7 +130,7 @@ export function CartView({ signedIn = false }: { signedIn?: boolean }) {
                     type="button"
                     onClick={() => setQuantity(line.productId, line.colorId, line.quantity + 1)}
                     aria-label="Increase quantity"
-                    className="flex h-9 w-9 items-center justify-center rounded-r-lg text-ink-300 transition-colors hover:bg-white/5 hover:text-white"
+                    className="flex h-9 w-9 items-center justify-center rounded-r-lg text-ink-300 transition-colors hover:bg-ink-800 hover:text-ink-100"
                   >
                     <Plus className="h-3.5 w-3.5" />
                   </button>
@@ -150,6 +154,37 @@ export function CartView({ signedIn = false }: { signedIn?: boolean }) {
       <aside className="glass-strong rounded-2xl p-6 lg:sticky lg:top-28">
         <h2 className="font-display text-lg font-semibold tracking-tight">Order summary</h2>
 
+        {/* Gift wrap upsell */}
+        <div className="mt-5 rounded-xl border border-ink-800 p-4">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={giftWrap}
+              onChange={(e) => setGiftWrap(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-ink-600 bg-[var(--surface-sunken)] accent-flame-500"
+            />
+            <span className="flex-1">
+              <span className="flex items-center gap-1.5 text-[13.5px] font-semibold">
+                <Gift className="h-3.5 w-3.5 text-flame-500" />
+                Gift wrap this order
+              </span>
+              <span className="mt-0.5 block text-[12px] text-ink-500">
+                Kraft wrap, ribbon and a handwritten card — {inr(giftWrapFee)}
+              </span>
+            </span>
+          </label>
+
+          {giftWrap && (
+            <textarea
+              value={giftNote}
+              onChange={(e) => setGiftNote(e.target.value.slice(0, 240))}
+              placeholder="Add a note for the card (optional)"
+              rows={2}
+              className="mt-3 w-full resize-none rounded-lg border border-ink-700 bg-[var(--surface-sunken)] px-3 py-2 text-[13px] text-ink-100 placeholder:text-ink-600 focus:border-flame-500/60 focus:outline-none focus:ring-4 focus:ring-flame-500/10"
+            />
+          )}
+        </div>
+
         <dl className="mt-5 space-y-2.5 text-[13.5px]">
           <div className="flex justify-between">
             <dt className="text-ink-400">
@@ -157,6 +192,12 @@ export function CartView({ signedIn = false }: { signedIn?: boolean }) {
             </dt>
             <dd className="font-mono tabular-nums">{inr(subtotal)}</dd>
           </div>
+          {giftWrap && (
+            <div className="flex justify-between">
+              <dt className="text-ink-400">Gift wrap</dt>
+              <dd className="font-mono tabular-nums">{inr(wrapFee)}</dd>
+            </div>
+          )}
           <div className="flex justify-between">
             <dt className="text-ink-400">GST (18%)</dt>
             <dd className="font-mono tabular-nums">{inr(gst)}</dd>
@@ -168,7 +209,7 @@ export function CartView({ signedIn = false }: { signedIn?: boolean }) {
             </dd>
           </div>
 
-          <div className="flex justify-between border-t border-white/10 pt-4">
+          <div className="flex justify-between border-t border-ink-800 pt-4">
             <dt className="font-display text-base font-semibold">Total</dt>
             <dd className="font-display text-xl font-bold text-flame-500">{inr(total)}</dd>
           </div>

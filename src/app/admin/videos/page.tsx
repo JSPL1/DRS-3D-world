@@ -44,7 +44,7 @@ export default async function AdminVideosPage() {
                   />
                 )}
                 {video.duration_sec && (
-                  <span className="absolute bottom-2.5 right-2.5 rounded-md bg-ink-950/85 px-2 py-1 font-mono text-[11px] text-white backdrop-blur-sm">
+                  <span className="on-media absolute bottom-2.5 right-2.5 rounded-md px-2 py-1 font-mono text-[11px]">
                     {Math.floor(video.duration_sec / 60)}:
                     {String(video.duration_sec % 60).padStart(2, '0')}
                   </span>

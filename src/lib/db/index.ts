@@ -138,6 +138,22 @@ function addMissingColumns(db: Database.Database) {
     ['products', 'approved_by_name', 'TEXT'],
     ['products', 'approved_at', 'TEXT'],
     ['products', 'review_note', 'TEXT'],
+
+    // Gift wrap add-on, chosen once per order (not per line).
+    ['orders', 'gift_wrap', 'INTEGER NOT NULL DEFAULT 0'],
+    ['orders', 'gift_wrap_fee', 'REAL NOT NULL DEFAULT 0'],
+    ['orders', 'gift_note', 'TEXT'],
+    // Delivery pin dropped in the checkout GPS step — optional, the shipping
+    // address text remains the source of truth for actually delivering.
+    ['orders', 'delivery_lat', 'REAL'],
+    ['orders', 'delivery_lng', 'REAL'],
+    ['orders', 'delivery_landmark', 'TEXT'],
+    ['orders', 'shipping_method', "TEXT NOT NULL DEFAULT 'standard'"],
+
+    // Loyalty: 1 point per ₹100 spent on a completed order, redeemable later.
+    ['users', 'loyalty_points', 'INTEGER NOT NULL DEFAULT 0'],
+    ['users', 'oauth_google_id', 'TEXT'],
+    ['users', 'oauth_facebook_id', 'TEXT'],
   ];
 
   for (const [table, column, definition] of additions) {
@@ -266,7 +282,10 @@ function linkDefaultProductColors(db: Database.Database) {
  */
 function ensureSettings(db: Database.Database) {
   const defaults: Array<[string, string, string]> = [
-    ['site_theme', 'dark', 'appearance'],
+    // Light is the flagship look of the "flame accents" redesign — new
+    // installs open on it. Existing installs keep whatever the admin already
+    // chose; this default only seeds a row that doesn't exist yet.
+    ['site_theme', 'light', 'appearance'],
     ['site_logo_url', '', 'appearance'],
     ['site_logo_light_url', '', 'appearance'],
     ['site_favicon_url', '', 'appearance'],
@@ -282,6 +301,30 @@ function ensureSettings(db: Database.Database) {
     ['smtp_pass', '', 'email'],
     ['smtp_from_name', 'DRS 3D WORLD', 'email'],
     ['smtp_from_address', '', 'email'],
+
+    // Shipping speed tiers offered at checkout. Standard is free above the
+    // free-delivery threshold (existing `free_delivery_above` setting);
+    // express/priority always carry their own fee.
+    ['shipping_standard_fee', '250', 'shipping'],
+    ['shipping_standard_days', '5-7 working days', 'shipping'],
+    ['shipping_express_fee', '600', 'shipping'],
+    ['shipping_express_days', '2-3 working days', 'shipping'],
+    ['shipping_priority_fee', '1200', 'shipping'],
+    ['shipping_priority_days', 'Next working day', 'shipping'],
+
+    // Gift wrap add-on fee, admin-configurable.
+    ['gift_wrap_fee', '149', 'shipping'],
+
+    // Dormant integrations — inert until the studio pastes in real
+    // credentials, following the same pattern as SMTP above.
+    ['oauth_google_client_id', '', 'integrations'],
+    ['oauth_google_client_secret', '', 'integrations'],
+    ['oauth_facebook_app_id', '', 'integrations'],
+    ['oauth_facebook_app_secret', '', 'integrations'],
+    ['razorpay_key_id', '', 'integrations'],
+    ['razorpay_key_secret', '', 'integrations'],
+    ['whatsapp_phone_id', '', 'integrations'],
+    ['whatsapp_access_token', '', 'integrations'],
   ];
 
   const insert = db.prepare(

@@ -51,7 +51,7 @@ function ChartTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-ink-900/95 px-3.5 py-2.5 shadow-lift backdrop-blur-sm">
+    <div className="rounded-xl border border-ink-700 bg-[var(--surface)] px-3.5 py-2.5 shadow-lift">
       <p className="text-[11px] font-medium text-ink-400">{label}</p>
       <ul className="mt-1.5 space-y-1">
         {payload.map((entry) => (
@@ -62,7 +62,7 @@ function ChartTooltip({
               style={{ background: entry.color }}
             />
             <span className="text-ink-300">{entry.name}</span>
-            <span className="ml-auto font-mono tabular-nums text-white">
+            <span className="ml-auto font-mono tabular-nums text-ink-100">
               {typeof entry.value === 'number' && format
                 ? format(entry.value)
                 : String(entry.value ?? '')}
@@ -117,10 +117,10 @@ function TableView({
       <summary className="cursor-pointer list-none text-[12px] text-ink-500 transition-colors hover:text-ink-300 [&::-webkit-details-marker]:hidden">
         View as table ›
       </summary>
-      <div className="mt-3 max-h-64 overflow-auto rounded-lg border border-white/5">
+      <div className="mt-3 max-h-64 overflow-auto rounded-lg border border-ink-800">
         <table className="w-full text-left text-[12px]">
           <caption className="sr-only">{caption}</caption>
-          <thead className="sticky top-0 bg-ink-900">
+          <thead className="sticky top-0 bg-[var(--surface)]">
             <tr>
               {columns.map((col) => (
                 <th key={col} className="px-3 py-2 font-medium text-ink-400">

@@ -11,6 +11,7 @@ import {
   StatsSection,
   TestimonialsSection,
 } from '@/components/sections/HomeSections';
+import { SplitHero } from '@/components/sections/SplitHero';
 import { getBranding } from '@/lib/branding';
 import { getHeroSculptUrl } from '@/lib/hero-model';
 import { getFeaturedProducts, getTestimonials } from '@/lib/queries';
@@ -54,7 +55,12 @@ export default function HomePage() {
     <>
       <HeroExperience theme={branding.theme} sculptUrl={sculptUrl} />
 
-      <div className="relative z-10 bg-ink-950">
+      {/* The redesign's hero sits directly beneath the 3D printer, not in
+          place of it — the studio's flagship animated scene stays, this
+          section is what the visitor actually acts on next. */}
+      <SplitHero />
+
+      <div className="relative z-10 bg-[var(--bg)]">
         <Marquee items={CAPABILITIES} />
         <ServicesSection />
         <FeaturedSection products={featured} />

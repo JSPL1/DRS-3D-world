@@ -43,7 +43,7 @@ export default async function AdminGalleryPage() {
                   sizes="(max-width: 768px) 50vw, 25vw"
                   className="object-cover"
                 />
-                <span className="absolute left-2.5 top-2.5 rounded-md bg-ink-950/80 px-2 py-1 font-mono text-[10px] uppercase tracking-wide text-ink-200 backdrop-blur-sm">
+                <span className="on-media absolute left-2.5 top-2.5 rounded-md px-2 py-1 font-mono text-[10px] uppercase tracking-wide">
                   {item.media_type.replace(/_/g, ' ')}
                 </span>
               </div>

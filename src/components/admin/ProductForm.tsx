@@ -63,11 +63,11 @@ export const emptyProduct: ProductFormValues = {
 };
 
 const inputClass =
-  'h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3.5 text-[14px] text-white ' +
+  'h-11 w-full rounded-xl border border-ink-700 bg-[var(--surface-sunken)] px-3.5 text-[14px] text-ink-100 ' +
   'placeholder:text-ink-500 transition-colors focus:border-flame-500/60 focus:outline-none focus:ring-4 focus:ring-flame-500/10';
 
 const selectClass =
-  'h-11 w-full rounded-xl border border-white/10 bg-ink-900 px-3.5 text-[14px] text-white ' +
+  'h-11 w-full rounded-xl border border-ink-700 bg-[var(--surface-sunken)] px-3.5 text-[14px] text-ink-100 ' +
   'transition-colors focus:border-flame-500/60 focus:outline-none focus:ring-4 focus:ring-flame-500/10';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

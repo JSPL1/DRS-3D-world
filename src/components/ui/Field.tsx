@@ -34,11 +34,11 @@ export function Field({
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
           className={cn(
-            'h-12 w-full rounded-xl border bg-white/[0.03] px-4 text-[14.5px] text-white',
-            'placeholder:text-ink-500 transition-all duration-300',
-            'focus:border-flame-500/60 focus:bg-white/[0.05] focus:outline-none focus:ring-4 focus:ring-flame-500/10',
+            'h-12 w-full rounded-xl border bg-[var(--surface-sunken)] px-4 text-[14.5px] text-ink-100',
+            'placeholder:text-ink-600 transition-all duration-300',
+            'focus:border-flame-500/70 focus:outline-none focus:ring-4 focus:ring-flame-500/10',
             isPassword && 'pr-12',
-            error ? 'border-red-500/60' : 'border-white/10 hover:border-white/20',
+            error ? 'border-red-500/60' : 'border-ink-700 hover:border-ink-600',
           )}
           {...props}
         />
@@ -48,7 +48,7 @@ export function Field({
             type="button"
             onClick={() => setReveal((v) => !v)}
             aria-label={reveal ? 'Hide password' : 'Show password'}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-ink-400 transition-colors hover:text-white"
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-ink-500 transition-colors hover:text-ink-100"
           >
             {reveal ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
@@ -56,7 +56,7 @@ export function Field({
       </div>
 
       {error ? (
-        <p id={`${id}-error`} className="flex items-center gap-1.5 text-[12.5px] text-red-400">
+        <p id={`${id}-error`} className="flex items-center gap-1.5 text-[12.5px] text-red-500">
           <AlertCircle className="h-3.5 w-3.5 shrink-0" />
           {error}
         </p>
@@ -74,7 +74,7 @@ export function FormError({ message }: { message?: string | null }) {
   return (
     <div
       role="alert"
-      className="flex items-start gap-2.5 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-[13px] text-red-300"
+      className="flex items-start gap-2.5 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-[13px] text-red-400"
     >
       <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
       <span>{message}</span>
@@ -87,7 +87,7 @@ export function FormNotice({ message }: { message?: string | null }) {
   return (
     <div
       role="status"
-      className="rounded-xl border border-flame-500/25 bg-flame-500/10 px-4 py-3 text-[13px] text-flame-300"
+      className="rounded-xl border border-flame-500/25 bg-flame-500/10 px-4 py-3 text-[13px] text-flame-500"
     >
       {message}
     </div>

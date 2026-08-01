@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertTriangle, CheckCircle2, FileUp, Loader2, RotateCcw } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
 import { Field, FormError, FormNotice } from '@/components/ui/Field';
@@ -31,8 +31,24 @@ export function QuoteCalculator({ rates }: { rates: QuoteRates }) {
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<string | null>(null);
+  const [handoffName, setHandoffName] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // A file chosen on the homepage's drop panel can't be carried over as an
+  // actual File (browsers don't allow scripting a file input's value) — we
+  // just surface its name so the visitor knows to pick it again here.
+  useEffect(() => {
+    try {
+      const handoff = sessionStorage.getItem('drs-quote-handoff');
+      if (handoff) {
+        setHandoffName(handoff);
+        sessionStorage.removeItem('drs-quote-handoff');
+      }
+    } catch {
+      // Not essential.
+    }
+  }, []);
 
   const selectedMaterial = MATERIALS.find((m) => m.id === materialId) ?? MATERIALS[0];
   const isResin = selectedMaterial.technology === 'SLA';
@@ -131,6 +147,12 @@ export function QuoteCalculator({ rates }: { rates: QuoteRates }) {
     <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
       {/* ---------------- Left: upload + parameters ---------------- */}
       <div className="flex flex-col gap-6">
+        {handoffName && !fileName && (
+          <FormNotice
+            message={`Continuing with "${handoffName}" — select it again below (browsers don't let us carry the file itself across pages).`}
+          />
+        )}
+
         {/* Dropzone */}
         <div
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -142,7 +164,7 @@ export function QuoteCalculator({ rates }: { rates: QuoteRates }) {
             if (file) void handleFile(file);
           }}
           className={`glass relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-10 text-center transition-all duration-300 ${
-            dragging ? 'border-flame-500 bg-flame-500/[0.07]' : 'border-white/10'
+            dragging ? 'border-flame-500 bg-flame-500/[0.07]' : 'border-ink-700'
           }`}
         >
           <input
@@ -190,7 +212,7 @@ export function QuoteCalculator({ rates }: { rates: QuoteRates }) {
               ].map((item) => (
                 <div key={item.label}>
                   <dt className="text-[11px] uppercase tracking-[0.14em] text-ink-500">{item.label}</dt>
-                  <dd className="mt-1 font-mono text-[15px] font-medium text-white">{item.value}</dd>
+                  <dd className="mt-1 font-mono text-[15px] font-medium text-ink-100">{item.value}</dd>
                 </div>
               ))}
             </dl>
@@ -228,7 +250,7 @@ export function QuoteCalculator({ rates }: { rates: QuoteRates }) {
                   id="material"
                   value={materialId}
                   onChange={(e) => setMaterialId(e.target.value)}
-                  className="mt-2 h-12 w-full rounded-xl border border-white/10 bg-ink-900 px-4 text-[14.5px] text-white transition-colors focus:border-flame-500/60 focus:outline-none focus:ring-4 focus:ring-flame-500/10"
+                  className="mt-2 h-12 w-full rounded-xl border border-ink-700 bg-[var(--surface-sunken)] px-4 text-[14.5px] text-ink-100 transition-colors focus:border-flame-500/60 focus:outline-none focus:ring-4 focus:ring-flame-500/10"
                 >
                   {MATERIALS.map((m) => (
                     <option key={m.id} value={m.id}>
@@ -300,7 +322,7 @@ export function QuoteCalculator({ rates }: { rates: QuoteRates }) {
                     type="checkbox"
                     checked={needsSupport}
                     onChange={(e) => setNeedsSupport(e.target.checked)}
-                    className="h-4 w-4 rounded border-white/20 bg-white/5 accent-flame-500"
+                    className="h-4 w-4 rounded border-ink-600 bg-[var(--surface-sunken)] accent-flame-500"
                   />
                   Needs support material
                 </label>
@@ -315,7 +337,7 @@ export function QuoteCalculator({ rates }: { rates: QuoteRates }) {
         <div className="glass-strong rounded-2xl p-7">
           {!quote ? (
             <div className="flex min-h-[380px] flex-col items-center justify-center text-center">
-              <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 text-ink-500">
+              <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-ink-700 text-ink-500">
                 ₹
               </span>
               <p className="mt-5 font-display text-lg font-semibold text-ink-300">
@@ -345,13 +367,13 @@ export function QuoteCalculator({ rates }: { rates: QuoteRates }) {
                 <button
                   onClick={reset}
                   aria-label="Start over"
-                  className="rounded-lg p-2 text-ink-500 transition-colors hover:text-white"
+                  className="rounded-lg p-2 text-ink-500 transition-colors hover:text-ink-100"
                 >
                   <RotateCcw className="h-4 w-4" />
                 </button>
               </div>
 
-              <dl className="mt-7 space-y-2.5 border-t border-white/8 pt-6 text-[13.5px]">
+              <dl className="mt-7 space-y-2.5 border-t border-ink-800 pt-6 text-[13.5px]">
                 {[
                   ['Material', `${quote.weightG.toFixed(0)} g ${quote.material.name}`, quote.materialCost],
                   ['Machine time', `${quote.printHours.toFixed(1)} hours`, quote.machineCost],
@@ -364,27 +386,27 @@ export function QuoteCalculator({ rates }: { rates: QuoteRates }) {
                       {label as string}
                       {detail && <span className="ml-1.5 text-ink-500">· {detail as string}</span>}
                     </dt>
-                    <dd className="font-mono text-white">{inr(value as number)}</dd>
+                    <dd className="font-mono text-ink-100">{inr(value as number)}</dd>
                   </div>
                 ))}
 
-                <div className="flex items-baseline justify-between gap-4 border-t border-white/8 pt-3">
+                <div className="flex items-baseline justify-between gap-4 border-t border-ink-800 pt-3">
                   <dt className="text-ink-400">Margin</dt>
-                  <dd className="font-mono text-white">{inr(quote.profit)}</dd>
+                  <dd className="font-mono text-ink-100">{inr(quote.profit)}</dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-4">
                   <dt className="text-ink-400">GST (18%)</dt>
-                  <dd className="font-mono text-white">{inr(quote.gst)}</dd>
+                  <dd className="font-mono text-ink-100">{inr(quote.gst)}</dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-4">
                   <dt className="text-ink-400">Delivery</dt>
-                  <dd className="font-mono text-white">
+                  <dd className="font-mono text-ink-100">
                     {quote.delivery === 0 ? 'Free' : inr(quote.delivery)}
                   </dd>
                 </div>
 
-                <div className="flex items-baseline justify-between gap-4 border-t border-white/10 pt-4">
-                  <dt className="font-display text-base font-semibold text-white">Total</dt>
+                <div className="flex items-baseline justify-between gap-4 border-t border-ink-700 pt-4">
+                  <dt className="font-display text-base font-semibold text-ink-100">Total</dt>
                   <dd className="font-display text-xl font-bold text-flame-500">{inr(quote.total)}</dd>
                 </div>
               </dl>
@@ -404,7 +426,7 @@ export function QuoteCalculator({ rates }: { rates: QuoteRates }) {
                   </span>
                 </div>
               ) : (
-                <form onSubmit={submitQuote} className="mt-6 flex flex-col gap-4 border-t border-white/8 pt-6">
+                <form onSubmit={submitQuote} className="mt-6 flex flex-col gap-4 border-t border-ink-800 pt-6">
                   <p className="text-[13px] font-medium text-ink-200">
                     Want us to confirm it? Send it over.
                   </p>

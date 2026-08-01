@@ -74,7 +74,7 @@ export function ProductGallery({
                 'flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[12.5px] font-medium transition-colors',
                 mode === m
                   ? 'bg-flame-500/15 text-flame-400'
-                  : 'text-ink-400 hover:bg-white/5 hover:text-white',
+                  : 'text-ink-400 hover:bg-ink-800 hover:text-ink-100',
               )}
             >
               {m === '360' && <RotateCw className="h-3.5 w-3.5" />}

@@ -79,11 +79,11 @@ export default async function AdminProductsPage({
           name="q"
           defaultValue={q ?? ''}
           placeholder="Search by name or SKU…"
-          className="h-11 flex-1 rounded-xl border border-white/10 bg-white/[0.03] px-4 text-[14px] text-white placeholder:text-ink-500 focus:border-flame-500/60 focus:outline-none focus:ring-4 focus:ring-flame-500/10 sm:max-w-sm"
+          className="h-11 flex-1 rounded-xl border border-ink-700 bg-[var(--surface-sunken)] px-4 text-[14px] text-ink-100 placeholder:text-ink-500 focus:border-flame-500/60 focus:outline-none focus:ring-4 focus:ring-flame-500/10 sm:max-w-sm"
         />
         <button
           type="submit"
-          className="h-11 rounded-xl border border-white/10 px-5 text-[13.5px] text-ink-200 transition-colors hover:border-flame-500/40 hover:text-flame-400"
+          className="h-11 rounded-xl border border-ink-700 px-5 text-[13.5px] text-ink-200 transition-colors hover:border-flame-500/40 hover:text-flame-400"
         >
           Search
         </button>
