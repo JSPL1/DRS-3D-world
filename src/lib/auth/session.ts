@@ -2,6 +2,7 @@ import 'server-only';
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { cache } from 'react';
 
 import { one, run } from '@/lib/db';
 import { cookieMaxAge, SESSION_COOKIE, signSession, verifySession, type SessionPayload } from './jwt';
@@ -19,8 +20,15 @@ export type CurrentUser = {
  * Reads the session cookie and re-checks it against the database, so a
  * suspended account or a password change takes effect immediately rather than
  * whenever the token happens to expire.
+ *
+ * Memoized per request with `cache()`: the site layout calls this for the
+ * navbar, and several pages (cart, checkout, products, product detail) call
+ * it again for their own logic — same cookies, same answer, so re-verifying
+ * the JWT and re-querying the user a second or third time on one page view
+ * was pure waste. The memoization is request-scoped only; it never reaches
+ * a second request; a sign-out or role change is visible on the very next one.
  */
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
@@ -49,7 +57,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     role: row.role,
     avatarUrl: row.avatar_url,
   };
-}
+});
 
 export async function createSession(
   user: { id: number; name: string; email: string; role: Role; token_version: number },

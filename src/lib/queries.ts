@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { cache } from 'react';
+
 import { all, one, parseJson } from '@/lib/db';
 
 /* ============================================================
@@ -301,7 +303,10 @@ export function getAllProductSlugs() {
    Taxonomy
    ============================================================ */
 
-export function getCategories() {
+// Memoized per request: the site layout reads this for the mega-menu on
+// every page, and the products page reads it again for its own category
+// rail — same request, same answer, one query instead of two.
+export const getCategories = cache(() => {
   return all<{
     id: number;
     name: string;
@@ -316,7 +321,7 @@ export function getCategories() {
               WHERE p.category_id = c.id AND ${PUBLIC_PRODUCT}) AS product_count
      FROM categories c WHERE c.is_active = 1 ORDER BY c.sort_order`,
   );
-}
+});
 
 export function getMaterials() {
   return all<{ material: string; c: number }>(

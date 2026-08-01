@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { cache } from 'react';
+
 import { DEFAULT_CURSOR, isCursorVariant, type CursorVariant } from '@/lib/cursor';
 import { getSettings } from '@/lib/queries';
 
@@ -29,7 +31,15 @@ export type Branding = {
   siteName: string;
 };
 
-export function getBranding(): Branding {
+/**
+ * Memoized per request: the root layout alone calls this three times
+ * (metadata, viewport, the shell itself), and every nested layout/page that
+ * needs the theme or logo calls it again. Without `cache()` a single page
+ * view was re-reading and re-computing this up to five times — real, free
+ * work to cut on a CPU-throttled host, and safe because the memoization
+ * never survives past the one request it was computed for.
+ */
+export const getBranding = cache((): Branding => {
   const settings = getSettings();
 
   const theme: Theme = settings.site_theme === 'light' ? 'light' : 'dark';
@@ -67,4 +77,4 @@ export function getBranding(): Branding {
     faviconHref,
     siteName: settings.site_name?.trim() || 'DRS 3D WORLD',
   };
-}
+});
