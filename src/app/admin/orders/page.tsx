@@ -1,14 +1,13 @@
 import { LiveRefresh } from '@/components/admin/LiveRefresh';
 import Link from 'next/link';
 
-import { StatusSelect } from '@/components/admin/StatusSelect';
-import {
-  Card, EmptyState, money, PageHeader, shortDate, Table, Td, Th,
-} from '@/components/admin/Shell';
-import { listAdminOrders } from '@/lib/admin-queries';
+import { Card, EmptyState, money, PageHeader } from '@/components/admin/Shell';
+import { OrderTable } from '@/components/admin/OrderTable';
+import { listAdminOrders, listOrderItemsForOrders } from '@/lib/admin-queries';
 import { can } from '@/lib/auth/roles';
 import { requirePermission } from '@/lib/auth/session';
 import { cn } from '@/lib/cn';
+import { all } from '@/lib/db';
 
 export const metadata = { title: 'Orders' };
 
@@ -16,8 +15,6 @@ const ORDER_STATUSES = [
   'pending', 'confirmed', 'printing', 'post_processing',
   'shipped', 'completed', 'cancelled', 'refunded',
 ] as const;
-
-const PAYMENT_STATUSES = ['unpaid', 'partial', 'paid', 'refunded'] as const;
 
 export default async function AdminOrdersPage({
   searchParams,
@@ -30,6 +27,35 @@ export default async function AdminOrdersPage({
   const validStatus = ORDER_STATUSES.includes(status as never) ? status : undefined;
   const orders = listAdminOrders(validStatus);
   const editable = can(user.role, 'orders.edit');
+
+  // Order-level extras (address, gift wrap, notes) shown in the expanded row —
+  // not part of listAdminOrders' summary shape, fetched once for this page.
+  const extrasById = new Map(
+    orders.length > 0
+      ? all<{
+          id: number;
+          shipping_address: string | null;
+          notes: string | null;
+          gift_wrap: number;
+          gift_note: string | null;
+          shipping_method: string | null;
+        }>(
+          `SELECT id, shipping_address, notes, gift_wrap, gift_note, shipping_method
+           FROM orders WHERE id IN (${orders.map(() => '?').join(',')})`,
+          orders.map((o) => o.id),
+        ).map((e) => [e.id, e])
+      : [],
+  );
+
+  const ordersWithExtras = orders.map((o) => ({ ...o, ...extrasById.get(o.id) }));
+
+  const items = listOrderItemsForOrders(orders.map((o) => o.id));
+  const itemsByOrder = new Map<number, typeof items>();
+  for (const item of items) {
+    const list = itemsByOrder.get(item.order_id) ?? [];
+    list.push(item);
+    itemsByOrder.set(item.order_id, list);
+  }
 
   const revenue = orders
     .filter((o) => !['cancelled', 'refunded'].includes(o.status))
@@ -49,7 +75,7 @@ export default async function AdminOrdersPage({
           href="/admin/orders"
           className={cn(
             'rounded-lg px-3.5 py-2 text-[12.5px] font-medium capitalize transition-colors',
-            !validStatus ? 'bg-flame-500/15 text-flame-400' : 'text-ink-400 hover:text-white',
+            !validStatus ? 'bg-flame-500/15 text-flame-400' : 'text-ink-400 hover:text-ink-100',
           )}
         >
           All
@@ -60,7 +86,7 @@ export default async function AdminOrdersPage({
             href={`/admin/orders?status=${s}`}
             className={cn(
               'rounded-lg px-3.5 py-2 text-[12.5px] font-medium capitalize transition-colors',
-              validStatus === s ? 'bg-flame-500/15 text-flame-400' : 'text-ink-400 hover:text-white',
+              validStatus === s ? 'bg-flame-500/15 text-flame-400' : 'text-ink-400 hover:text-ink-100',
             )}
           >
             {s.replace(/_/g, ' ')}
@@ -75,52 +101,7 @@ export default async function AdminOrdersPage({
             body={validStatus ? 'Nothing currently has that status.' : 'Orders will appear here as they come in.'}
           />
         ) : (
-          <Table>
-            <thead>
-              <tr>
-                <Th>Order</Th>
-                <Th>Customer</Th>
-                <Th className="text-right">Items</Th>
-                <Th className="text-right">Total</Th>
-                <Th>Status</Th>
-                <Th>Payment</Th>
-                <Th className="text-right">Placed</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((order) => (
-                <tr key={order.id} className="transition-colors hover:bg-white/[0.02]">
-                  <Td className="font-mono text-[12.5px] text-white">{order.order_number}</Td>
-                  <Td>
-                    <span className="block font-medium text-white">{order.customer_name}</span>
-                    <span className="block text-[12px] text-ink-500">{order.customer_email}</span>
-                  </Td>
-                  <Td className="text-right tabular-nums text-ink-300">{order.item_count}</Td>
-                  <Td className="text-right font-mono tabular-nums text-white">{money(order.total)}</Td>
-                  <Td>
-                    {editable ? (
-                      <StatusSelect entity="order" id={order.id} value={order.status} options={ORDER_STATUSES} />
-                    ) : (
-                      <span className="capitalize text-ink-300">{order.status.replace(/_/g, ' ')}</span>
-                    )}
-                  </Td>
-                  <Td>
-                    {editable ? (
-                      <StatusSelect
-                        entity="orderPayment"
-                        id={order.id}
-                        value={order.payment_status}
-                        options={PAYMENT_STATUSES}
-                      />
-                    ) : (
-                      <span className="capitalize text-ink-300">{order.payment_status}</span>
-                    )}
-                  </Td>
-                  <Td className="text-right text-[12.5px] text-ink-500">{shortDate(order.created_at)}</Td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
+          <OrderTable orders={ordersWithExtras} itemsByOrder={itemsByOrder} editable={editable} />
         )}
       </Card>
     </>

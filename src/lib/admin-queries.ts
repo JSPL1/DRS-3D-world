@@ -282,11 +282,34 @@ export function listAdminOrders(status?: string, limit = 80) {
     payment_status: string;
     created_at: string;
     item_count: number;
+    first_product_name: string | null;
   }>(
-    `SELECT o.*, (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count
+    `SELECT o.*,
+            (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count,
+            (SELECT i.product_name FROM order_items i WHERE i.order_id = o.id ORDER BY i.id LIMIT 1) AS first_product_name
      FROM orders o ${status ? 'WHERE o.status = ?' : ''}
      ORDER BY o.created_at DESC LIMIT ?`,
     status ? [status, limit] : [limit],
+  );
+}
+
+/** Batched — one query for every order on the page, not one query per row. */
+export function listOrderItemsForOrders(orderIds: number[]) {
+  if (orderIds.length === 0) return [];
+  const placeholders = orderIds.map(() => '?').join(',');
+  return all<{
+    order_id: number;
+    product_name: string;
+    sku: string | null;
+    quantity: number;
+    unit_price: number;
+    total: number;
+    color_name: string | null;
+    color_hex: string | null;
+  }>(
+    `SELECT order_id, product_name, sku, quantity, unit_price, total, color_name, color_hex
+     FROM order_items WHERE order_id IN (${placeholders}) ORDER BY id`,
+    orderIds,
   );
 }
 
