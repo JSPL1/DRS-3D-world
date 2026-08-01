@@ -14,7 +14,7 @@ import {
 import { SplitHero } from '@/components/sections/SplitHero';
 import { getBranding } from '@/lib/branding';
 import { getHeroSculptUrl } from '@/lib/hero-model';
-import { getFeaturedProducts, getTestimonials } from '@/lib/queries';
+import { getFeaturedProducts, getSettings, getTestimonials } from '@/lib/queries';
 
 // The hero pulls in three.js — keep it out of the initial JS payload.
 const HeroExperience = nextDynamic(
@@ -50,10 +50,18 @@ export default function HomePage() {
   const testimonials = getTestimonials(6);
   const branding = getBranding();
   const sculptUrl = getHeroSculptUrl();
+  const settings = getSettings();
+
+  const hero3d = {
+    enabled: settings.hero_3d_enabled !== 'false',
+    playMode: settings.hero_3d_play_mode === 'time' ? ('time' as const) : ('scroll' as const),
+    scrollVh: Math.min(1200, Math.max(200, Number(settings.hero_3d_scroll_vh) || 720)),
+    timeSeconds: Math.min(60, Math.max(3, Number(settings.hero_3d_time_seconds) || 14)),
+  };
 
   return (
     <>
-      <HeroExperience theme={branding.theme} sculptUrl={sculptUrl} />
+      <HeroExperience theme={branding.theme} sculptUrl={sculptUrl} {...hero3d} />
 
       {/* The redesign's hero sits directly beneath the 3D printer, not in
           place of it — the studio's flagship animated scene stays, this

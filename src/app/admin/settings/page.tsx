@@ -37,6 +37,48 @@ const GROUPS: SettingGroup[] = [
     ],
   },
   {
+    title: '3D hero (homepage)',
+    description:
+      'The scroll-driven 3D printer at the top of the homepage. Turn it off for a plainer, lighter-weight homepage, or choose how it plays.',
+    fields: [
+      {
+        key: 'hero_3d_enabled',
+        label: '3D hero',
+        type: 'select',
+        options: [
+          { value: 'true', label: 'Enabled' },
+          { value: 'false', label: 'Disabled (static hero instead)' },
+        ],
+      },
+      {
+        key: 'hero_3d_play_mode',
+        label: 'Play mode',
+        type: 'select',
+        options: [
+          { value: 'scroll', label: 'Scroll-linked' },
+          { value: 'time', label: 'Timed autoplay' },
+        ],
+        hint:
+          'Scroll-linked: progress follows how far the visitor scrolls — set the scroll length below. ' +
+          'Timed autoplay: plays on a clock once it comes into view, however the visitor scrolls — set the duration below.',
+      },
+      {
+        key: 'hero_3d_scroll_vh',
+        label: 'Scroll length',
+        type: 'number',
+        suffix: 'vh',
+        hint: 'Used only in Scroll-linked mode. Viewport-heights of scrolling to finish the sequence. Default 720 — lower finishes sooner, higher takes more scrolling.',
+      },
+      {
+        key: 'hero_3d_time_seconds',
+        label: 'Autoplay duration',
+        type: 'number',
+        suffix: 'sec',
+        hint: 'Used only in Timed autoplay mode. How many seconds the sequence takes to play through once it is in view.',
+      },
+    ],
+  },
+  {
     title: 'Email',
     description:
       'Verification codes, order confirmations and password resets are sent from here. Until these are filled in, nothing is sent — sign-up and password reset will not work.',

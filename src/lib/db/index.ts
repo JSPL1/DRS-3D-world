@@ -286,10 +286,28 @@ function ensureSettings(db: Database.Database) {
     // installs open on it. Existing installs keep whatever the admin already
     // chose; this default only seeds a row that doesn't exist yet.
     ['site_theme', 'light', 'appearance'],
-    ['site_logo_url', '', 'appearance'],
-    ['site_logo_light_url', '', 'appearance'],
-    ['site_favicon_url', '', 'appearance'],
+    // The studio's own badge mark, shipped as a static asset at
+    // public/brand/logo.png so it survives every deploy without needing a
+    // re-upload — unlike admin-uploaded logos, which live on the runtime
+    // data disk. The admin can still replace it from Settings at any time.
+    ['site_logo_url', '/brand/logo.png', 'appearance'],
+    ['site_logo_light_url', '/brand/logo.png', 'appearance'],
+    ['site_favicon_url', '/brand/logo.png', 'appearance'],
     ['site_cursor', 'system', 'appearance'],
+
+    // The homepage's scroll-driven 3D printer. Disabling it swaps in a
+    // static hero for visitors on low-powered devices or when the studio
+    // just wants a simpler homepage. The two play modes are genuinely
+    // different mechanisms, not the same thing relabelled: "scroll" ties
+    // progress to how far the visitor has scrolled (`hero_3d_scroll_vh` is
+    // the runway length, in viewport-heights, that takes to finish);
+    // "time" autoplays the identical sequence on a clock once the hero
+    // scrolls into view, over `hero_3d_time_seconds`, regardless of
+    // whether the visitor scrolls at all.
+    ['hero_3d_enabled', 'true', 'appearance'],
+    ['hero_3d_play_mode', 'scroll', 'appearance'],
+    ['hero_3d_scroll_vh', '720', 'appearance'],
+    ['hero_3d_time_seconds', '14', 'appearance'],
 
     // Outgoing mail. Blank until the studio fills it in; every code-sending
     // flow reports a clear "not configured" error until then rather than

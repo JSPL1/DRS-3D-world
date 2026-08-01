@@ -209,16 +209,86 @@ const FADE = {
 };
 
 /* ============================================================
+   Static fallback — the 3D sequence switched off in Settings
+   ============================================================ */
+
+/**
+ * Same opening copy as the "intro" phase of the 3D experience, without the
+ * canvas, scroll pinning or WebGL cost. Used when an administrator disables
+ * the 3D hero — for low-powered devices, or simply because a plainer
+ * homepage is what they want.
+ */
+function StaticHero({ light }: { light: boolean }) {
+  return (
+    <section className="relative flex h-dvh min-h-[560px] flex-col items-center justify-center overflow-hidden px-6 text-center">
+      <div
+        aria-hidden
+        className={
+          light
+            ? 'absolute inset-0 bg-gradient-to-b from-[#fbfbfd] via-[#f1f1f5] to-[#e9e9ef]'
+            : 'absolute inset-0 bg-gradient-to-b from-ink-950 via-ink-900 to-ink-950'
+        }
+      />
+      <div
+        aria-hidden
+        className={`absolute left-1/2 top-1/2 h-[80vh] w-[80vh] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[140px] ${
+          light ? 'bg-flame-500/[0.10]' : 'bg-flame-500/[0.07]'
+        }`}
+      />
+
+      <span className="relative mb-6 inline-flex items-center gap-2 rounded-full border border-flame-500/30 bg-flame-500/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-flame-400">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-flame-500" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-flame-500" />
+        </span>
+        Bhubaneswar · Odisha
+      </span>
+
+      <h1 className="relative font-display text-[13vw] font-bold leading-[0.86] tracking-[-0.04em] sm:text-[10vw] lg:text-[8.5vw] xl:text-[7.5rem]">
+        <span className="block text-white">DRS 3D</span>
+        <span className="block text-flame">WORLD</span>
+      </h1>
+
+      <p className="relative mt-7 max-w-xl text-balance-pretty text-base leading-relaxed text-ink-200 sm:text-lg">
+        {site.slogan}.
+      </p>
+
+      <div className="relative pointer-events-auto mt-9 flex flex-col gap-3 sm:flex-row">
+        <ButtonLink href="/quote" size="lg">
+          Get an instant quote
+          <ArrowRight className="h-4 w-4" />
+        </ButtonLink>
+        <ButtonLink href="/products" variant="secondary" size="lg">
+          See what we make
+        </ButtonLink>
+      </div>
+    </section>
+  );
+}
+
+/* ============================================================
    The section
    ============================================================ */
 
 export function HeroExperience({
   theme = 'dark',
   sculptUrl = null,
+  enabled = true,
+  playMode = 'scroll',
+  scrollVh = 720,
+  timeSeconds = 14,
 }: {
   theme?: 'dark' | 'light';
   /** Path to the studio's sculpted mesh, when one has been supplied. */
   sculptUrl?: string | null;
+  /** Admin-controlled: the whole 3D sequence can be switched off. */
+  enabled?: boolean;
+  /** "scroll" ties progress to scroll position; "time" autoplays on a clock. */
+  playMode?: 'scroll' | 'time';
+  /** Scroll-mode only: how many viewport-heights the sequence runs over. */
+  scrollVh?: number;
+  /** Time-mode only: how many seconds the autoplay takes to finish. */
+  timeSeconds?: number;
 }) {
   const sectionRef = useRef<HTMLElement>(null);
   const sceneState = useRef(createSceneState());
@@ -246,15 +316,10 @@ export function HeroExperience({
   const layerNowRef = useRef<HTMLSpanElement>(null);
   const layerBarRef = useRef<HTMLDivElement>(null);
 
-  /* ---- Scroll → scene state, without re-rendering React on every frame ---- */
-  const readScroll = useCallback(() => {
-    const el = sectionRef.current;
-    if (!el) return;
-
-    const rect = el.getBoundingClientRect();
-    const scrollable = rect.height - window.innerHeight;
-    const p = scrollable > 0 ? clamp01(-rect.top / scrollable) : 0;
-
+  /* ---- Progress (0→1, from either scroll or a clock) → scene state ----
+     Shared by both play modes so the choreography itself never has to know
+     which one is driving it. */
+  const applyProgress = useCallback((p: number) => {
     sceneState.current.scroll = p;
     if (p > 0.01) sceneState.current.hasScrolled = true;
 
@@ -287,26 +352,41 @@ export function HeroExperience({
     }
   }, []);
 
+  const readScroll = useCallback(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+
+    const rect = el.getBoundingClientRect();
+    const scrollable = rect.height - window.innerHeight;
+    const p = scrollable > 0 ? clamp01(-rect.top / scrollable) : 0;
+    applyProgress(p);
+  }, [applyProgress]);
+
   useEffect(() => {
     let frame = 0;
-    const onScroll = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(readScroll);
-    };
-
     const onPointerMove = (e: PointerEvent) => {
       mouse.current.x = (e.clientX / window.innerWidth) * 2 - 1;
       mouse.current.y = -((e.clientY / window.innerHeight) * 2 - 1);
     };
-
-    readScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll, { passive: true });
     window.addEventListener('pointermove', onPointerMove, { passive: true });
 
-    // The sticky viewport is the thing that is actually on screen; observing
-    // the 720vh section itself would report "visible" for the whole page.
-    const stage = sectionRef.current?.firstElementChild;
+    let onScroll: (() => void) | null = null;
+    if (playMode === 'scroll') {
+      onScroll = () => {
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(readScroll);
+      };
+      readScroll();
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll, { passive: true });
+    }
+
+    // The sticky viewport (scroll mode) or the section itself (time mode,
+    // which is exactly one viewport tall) is what's actually on screen —
+    // observing the 720vh scroll-mode section itself would report "visible"
+    // for the whole page.
+    const stage =
+      playMode === 'scroll' ? sectionRef.current?.firstElementChild : sectionRef.current;
     const observer = stage
       ? new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), {
           threshold: 0,
@@ -326,13 +406,37 @@ export function HeroExperience({
 
     return () => {
       cancelAnimationFrame(frame);
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
+      if (onScroll) {
+        window.removeEventListener('scroll', onScroll);
+        window.removeEventListener('resize', onScroll);
+      }
       window.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('visibilitychange', onVisibility);
       observer?.disconnect();
     };
-  }, [readScroll]);
+  }, [readScroll, playMode]);
+
+  /* ---- Time mode: autoplay the same sequence on a clock ----
+     Starts the first time the section is on screen and runs to completion
+     even if the visitor scrolls past mid-way, like a video would. */
+  const timeStartedRef = useRef(false);
+  useEffect(() => {
+    if (playMode !== 'time' || !inView || timeStartedRef.current) return;
+    timeStartedRef.current = true;
+
+    let raf = 0;
+    const durationMs = timeSeconds * 1000;
+    const start = performance.now();
+
+    const tick = (now: number) => {
+      const p = clamp01((now - start) / durationMs);
+      applyProgress(p);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+
+    return () => cancelAnimationFrame(raf);
+  }, [playMode, inView, timeSeconds, applyProgress]);
 
   const partsForGroup = useMemo(
     () =>
@@ -344,9 +448,16 @@ export function HeroExperience({
     phase.kind === 'printing' ? PRINT_PRODUCTS[phase.productIndex % PRINT_PRODUCTS.length] : null;
   const layerTotal = activeProduct ? Math.round(activeProduct.height * 480) : 0;
 
+  if (!enabled) return <StaticHero light={light} />;
+
   return (
-    <section ref={sectionRef} className="relative h-[720vh]" aria-label="The DRS printing process">
-      <div className="sticky top-0 h-dvh overflow-hidden">
+    <section
+      ref={sectionRef}
+      className="relative"
+      style={{ height: playMode === 'scroll' ? `${scrollVh}vh` : '100dvh' }}
+      aria-label="The DRS printing process"
+    >
+      <div className={playMode === 'scroll' ? 'sticky top-0 h-dvh overflow-hidden' : 'h-dvh overflow-hidden'}>
         {/* Backdrop */}
         <div
           aria-hidden
