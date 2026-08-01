@@ -487,6 +487,82 @@ textarea::placeholder {
   animation: drs-marquee 34s linear infinite;
 }
 
+/* Running neon frame ---------------------------------------
+   Marks the one record an admin currently has expanded. A tinted row
+   was not enough to find again after scrolling — a moving light is,
+   because motion is what the eye actually catches.
+
+   The ring is a conic-gradient rotated by an animated custom property,
+   masked down to the 2px border so only the edge paints. Where
+   `@property` is unsupported the angle simply doesn't animate and the
+   frame renders as a static gradient ring, which still identifies the
+   row. Only ever one of these on screen at a time, so the repaint cost
+   is a single small element — this is not the repeated blur that made
+   the site laggy before. */
+@property --drs-neon-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes drs-neon-spin {
+  to {
+    --drs-neon-angle: 360deg;
+  }
+}
+
+.neon-frame {
+  position: relative;
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.neon-frame::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 18px;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--drs-neon-angle),
+    transparent 0deg,
+    var(--color-flame-500) 45deg,
+    #22d3ee 80deg,
+    var(--color-flame-500) 115deg,
+    transparent 160deg,
+    transparent 360deg
+  );
+  /* Paints the border only: the outer box minus the content box. */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: drs-neon-spin 2.6s linear infinite;
+  pointer-events: none;
+}
+
+/* The soft halo that makes it read as "neon" rather than a plain border. */
+.neon-frame::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 18px;
+  box-shadow:
+    0 0 12px -2px color-mix(in srgb, var(--color-flame-500) 55%, transparent),
+    0 0 26px -6px color-mix(in srgb, #22d3ee 45%, transparent);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .neon-frame::before {
+    animation: none;
+  }
+}
+
 /* Skeleton loading ---------------------------------------- */
 .skeleton {
   position: relative;

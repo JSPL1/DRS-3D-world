@@ -14,26 +14,6 @@ const ORDER_STATUSES = [
 
 const PAYMENT_STATUSES = ['unpaid', 'partial', 'paid', 'refunded'] as const;
 
-/**
- * Each order gets a fixed colour from this set (by id, so it never changes
- * between renders) — a quiet dot at all times, and the full treatment (row
- * tint, left border, matching detail panel) only when that order is the one
- * expanded. With every row the same shade, an admin scrolling a long list had
- * no way to tell which row belonged to the panel they had open below it.
- */
-const ORDER_ACCENTS = [
-  { dot: 'bg-sky-500', border: 'border-sky-500', tint: 'bg-sky-500/[0.07]', text: 'text-sky-400' },
-  { dot: 'bg-violet-500', border: 'border-violet-500', tint: 'bg-violet-500/[0.07]', text: 'text-violet-400' },
-  { dot: 'bg-emerald-500', border: 'border-emerald-500', tint: 'bg-emerald-500/[0.07]', text: 'text-emerald-400' },
-  { dot: 'bg-amber-500', border: 'border-amber-500', tint: 'bg-amber-500/[0.07]', text: 'text-amber-400' },
-  { dot: 'bg-red-500', border: 'border-red-500', tint: 'bg-red-500/[0.07]', text: 'text-red-400' },
-  { dot: 'bg-flame-500', border: 'border-flame-500', tint: 'bg-flame-500/[0.07]', text: 'text-flame-500' },
-] as const;
-
-function accentFor(id: number) {
-  return ORDER_ACCENTS[id % ORDER_ACCENTS.length];
-}
-
 export type AdminOrderRow = {
   id: number;
   order_number: string;
@@ -93,23 +73,12 @@ export function OrderTable({
           const isOpen = expanded === order.id;
           const items = itemsByOrder.get(order.id) ?? [];
           const moreCount = order.item_count - 1;
-          const accent = accentFor(order.id);
 
           return (
             <Fragment key={order.id}>
-              <tr
-                className={cn(
-                  'border-l-2 transition-colors',
-                  isOpen ? cn(accent.border, accent.tint) : 'border-l-transparent hover:bg-white/[0.02]',
-                )}
-              >
+              <tr className={cn('transition-colors', isOpen ? 'bg-flame-500/[0.06]' : 'hover:bg-white/[0.02]')}>
                 <Td>
                   <div className="flex items-center gap-2.5">
-                    <span
-                      aria-hidden
-                      className={cn('h-2 w-2 shrink-0 rounded-full', accent.dot)}
-                      title="This order's colour in the list"
-                    />
                     <button
                       type="button"
                       onClick={() => setExpanded(isOpen ? null : order.id)}
@@ -118,7 +87,7 @@ export function OrderTable({
                       className={cn(
                         'relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all',
                         isOpen
-                          ? cn('rotate-45 bg-current/15', accent.border, accent.text)
+                          ? 'rotate-45 border-flame-500 bg-flame-500/15 text-flame-500'
                           : 'border-flame-500/40 text-flame-500 hover:border-flame-500 hover:bg-flame-500/10',
                       )}
                     >
@@ -127,7 +96,7 @@ export function OrderTable({
                       )}
                       <Plus className="relative h-3.5 w-3.5" />
                     </button>
-                    <span className={cn('font-mono text-[12.5px]', isOpen ? cn('font-semibold', accent.text) : 'text-ink-100')}>
+                    <span className={cn('font-mono text-[12.5px]', isOpen ? 'font-semibold text-flame-500' : 'text-ink-100')}>
                       {order.order_number}
                     </span>
                   </div>
@@ -163,14 +132,15 @@ export function OrderTable({
 
               {isOpen && (
                 <tr>
-                  <td colSpan={8} className={cn('border-b-2 border-l-2 bg-[var(--surface-sunken)] p-0', accent.border)}>
-                    <div className="p-5">
-                      <p className={cn('flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em]', accent.text)}>
-                        <span aria-hidden className={cn('h-2 w-2 rounded-full', accent.dot)} />
+                  <td colSpan={8} className="bg-[var(--surface-sunken)] p-0">
+                    {/* The running neon ring: on only while this order is
+                        expanded, gone the moment it is closed. */}
+                    <div className="neon-frame m-4 p-5">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-flame-500">
                         Full order — {order.order_number}
                       </p>
 
-                      <div className={cn('mt-3 overflow-hidden rounded-xl border', accent.border)}>
+                      <div className="mt-3 overflow-hidden rounded-xl border border-ink-800">
                         <table className="w-full text-left text-[13px]">
                           <thead>
                             <tr className="bg-[var(--surface)]">
