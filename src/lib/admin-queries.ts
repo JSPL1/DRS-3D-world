@@ -328,7 +328,32 @@ export function listAdminQuotes(limit = 80) {
   }>(`SELECT * FROM quotes ORDER BY created_at DESC LIMIT ?`, [limit]);
 }
 
-export function listAdminUsers() {
+export type AdminUserFilters = {
+  search?: string;
+  role?: string;
+  status?: string;
+};
+
+export function listAdminUsers(filters: AdminUserFilters = {}) {
+  const where: string[] = [];
+  const params: unknown[] = [];
+
+  if (filters.search) {
+    where.push('(u.name LIKE ? OR u.email LIKE ? OR u.phone LIKE ?)');
+    const like = `%${filters.search}%`;
+    params.push(like, like, like);
+  }
+  if (filters.role) {
+    where.push('u.role = ?');
+    params.push(filters.role);
+  }
+  if (filters.status) {
+    where.push('u.status = ?');
+    params.push(filters.status);
+  }
+
+  const clause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+
   return all<{
     id: number;
     name: string;
@@ -336,10 +361,19 @@ export function listAdminUsers() {
     phone: string | null;
     role: string;
     status: string;
+    email_verified_at: string | null;
     last_login_at: string | null;
     created_at: string;
-  }>(`SELECT id, name, email, phone, role, status, last_login_at, created_at
-      FROM users ORDER BY role, name`);
+    order_count: number;
+  }>(
+    `SELECT u.id, u.name, u.email, u.phone, u.role, u.status, u.email_verified_at,
+            u.last_login_at, u.created_at,
+            (SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id) AS order_count
+     FROM users u
+     ${clause}
+     ORDER BY u.role, u.name`,
+    params,
+  );
 }
 
 export function listAdminCategories() {
