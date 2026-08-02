@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { guard } from '@/lib/auth/api-guard';
 import { can, type Permission } from '@/lib/auth/roles';
 import { logActivity } from '@/lib/auth/session';
-import { getDb, run } from '@/lib/db';
+import { run } from '@/lib/db';
 import { uploadsDir } from '@/lib/uploads';
 
 export const runtime = 'nodejs';
@@ -125,7 +125,7 @@ export async function POST(req: Request) {
 
   const url = `/uploads/${name}`;
 
-  run(
+  await run(
     `INSERT INTO media (file_name, url, mime_type, size_bytes, folder, uploaded_by)
      VALUES (?, ?, ?, ?, ?, ?)`,
     [file.name.slice(0, 200), url, file.type, buffer.length, purpose, user.id],
@@ -139,18 +139,17 @@ export async function POST(req: Request) {
   };
   const key = BRANDING_KEYS[purpose];
   if (key) {
-    getDb()
-      .prepare(
-        `INSERT INTO settings (key, value, "group", updated_at)
-         VALUES (?, ?, 'appearance', datetime('now'))
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`,
-      )
-      .run(key, url);
+    await run(
+      `INSERT INTO settings (\`key\`, value, \`group\`, updated_at)
+       VALUES (?, ?, 'appearance', NOW())
+       ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()`,
+      [key, url],
+    );
 
     revalidatePath('/', 'layout');
   }
 
-  logActivity(user.id, user.name, `uploaded ${purpose}`, 'media', undefined, url);
+  await logActivity(user.id, user.name, `uploaded ${purpose}`, 'media', undefined, url);
 
   return NextResponse.json({ ok: true, url, name });
 }

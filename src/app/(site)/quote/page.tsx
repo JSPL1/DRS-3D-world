@@ -18,8 +18,8 @@ export const metadata: Metadata = {
 // change effectively never reach visitors.
 export const dynamic = 'force-dynamic';
 
-export default function QuotePage() {
-  const settings = getSettings();
+export default async function QuotePage() {
+  const settings = await getSettings();
 
   const num = (key: string, fallback: number) => {
     const value = Number(settings[key]);

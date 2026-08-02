@@ -106,13 +106,14 @@ const PRODUCT_SELECT = `
    Products
    ============================================================ */
 
-export function getFeaturedProducts(limit = 6): Product[] {
-  return all<ProductRow>(
+export async function getFeaturedProducts(limit = 6): Promise<Product[]> {
+  const rows = await all<ProductRow>(
     `${PRODUCT_SELECT}
      WHERE ${PUBLIC_PRODUCT} AND p.is_featured = 1
      ORDER BY p.sort_order LIMIT ?`,
     [limit],
-  ).map(hydrate);
+  );
+  return rows.map(hydrate);
 }
 
 export type ProductFilters = {
@@ -128,7 +129,9 @@ export type ProductFilters = {
   offset?: number;
 };
 
-export function getProducts(filters: ProductFilters = {}): { items: Product[]; total: number } {
+export async function getProducts(
+  filters: ProductFilters = {},
+): Promise<{ items: Product[]; total: number }> {
   const where: string[] = [PUBLIC_PRODUCT];
   const params: unknown[] = [];
 
@@ -178,30 +181,28 @@ export function getProducts(filters: ProductFilters = {}): { items: Product[]; t
             ? 'ORDER BY p.rating_avg DESC, p.rating_count DESC'
             : 'ORDER BY p.created_at DESC, p.sort_order';
 
-  const total =
-    (
-      one<{ c: number }>(
-        `SELECT COUNT(*) AS c FROM products p
-         LEFT JOIN categories c ON c.id = p.category_id ${whereSql}`,
-        params,
-      ) ?? { c: 0 }
-    ).c;
+  const totalRow = await one<{ c: number }>(
+    `SELECT COUNT(*) AS c FROM products p
+     LEFT JOIN categories c ON c.id = p.category_id ${whereSql}`,
+    params,
+  );
+  const total = totalRow?.c ?? 0;
 
   const limit = filters.limit ?? 12;
   const offset = filters.offset ?? 0;
 
-  const items = all<ProductRow>(
+  const rows = await all<ProductRow>(
     `${PRODUCT_SELECT} ${whereSql} ${orderSql} LIMIT ? OFFSET ?`,
     [...params, limit, offset],
-  ).map(hydrate);
+  );
 
-  return { items, total };
+  return { items: rows.map(hydrate), total };
 }
 
-export function getProductBySlug(slug: string): Product | null {
+export async function getProductBySlug(slug: string): Promise<Product | null> {
   // Filtered, not just fetched: without this a draft or an unapproved product
   // was reachable by anyone who knew or guessed its URL.
-  const row = one<ProductRow>(`${PRODUCT_SELECT} WHERE p.slug = ? AND ${PUBLIC_PRODUCT}`, [slug]);
+  const row = await one<ProductRow>(`${PRODUCT_SELECT} WHERE p.slug = ? AND ${PUBLIC_PRODUCT}`, [slug]);
   return row ? hydrate(row) : null;
 }
 
@@ -219,8 +220,8 @@ export type ProductColor = {
  * means the product has no colour choice — services and made-to-order work
  * often don't.
  */
-export function getProductColors(productId: number): ProductColor[] {
-  return all<{
+export async function getProductColors(productId: number): Promise<ProductColor[]> {
+  const rows = await all<{
     id: number;
     name: string;
     hex: string;
@@ -234,7 +235,8 @@ export function getProductColors(productId: number): ProductColor[] {
      WHERE pc.product_id = ? AND c.is_active = 1
      ORDER BY pc.sort_order, c.sort_order`,
     [productId],
-  ).map((r) => ({
+  );
+  return rows.map((r) => ({
     id: r.id,
     name: r.name,
     hex: r.hex,
@@ -245,21 +247,21 @@ export function getProductColors(productId: number): ProductColor[] {
 }
 
 /** The studio's full palette, for the admin colour picker. */
-export function getColorPalette() {
+export async function getColorPalette() {
   return all<{ id: number; name: string; hex: string; is_active: number; sort_order: number }>(
     `SELECT id, name, hex, is_active, sort_order FROM colors ORDER BY sort_order, name`,
   );
 }
 
 /** Colour counts for the product list, so cards can show "6 colours". */
-export function getColorCounts(): Record<number, number> {
-  const rows = all<{ product_id: number; c: number }>(
+export async function getColorCounts(): Promise<Record<number, number>> {
+  const rows = await all<{ product_id: number; c: number }>(
     `SELECT product_id, COUNT(*) AS c FROM product_colors GROUP BY product_id`,
   );
   return Object.fromEntries(rows.map((r) => [r.product_id, r.c]));
 }
 
-export function getProductImages(productId: number, kind: 'gallery' | '360' = 'gallery') {
+export async function getProductImages(productId: number, kind: 'gallery' | '360' = 'gallery') {
   return all<{ id: number; url: string; alt: string | null }>(
     `SELECT id, url, alt FROM product_images
      WHERE product_id = ? AND kind = ? ORDER BY sort_order`,
@@ -267,17 +269,18 @@ export function getProductImages(productId: number, kind: 'gallery' | '360' = 'g
   );
 }
 
-export function getRelatedProducts(productId: number, limit = 4): Product[] {
-  return all<ProductRow>(
+export async function getRelatedProducts(productId: number, limit = 4): Promise<Product[]> {
+  const rows = await all<ProductRow>(
     `${PRODUCT_SELECT}
      WHERE p.id IN (SELECT related_id FROM product_relations WHERE product_id = ?)
        AND ${PUBLIC_PRODUCT}
      LIMIT ?`,
     [productId, limit],
-  ).map(hydrate);
+  );
+  return rows.map(hydrate);
 }
 
-export function getProductReviews(productId: number) {
+export async function getProductReviews(productId: number) {
   return all<{
     id: number;
     author_name: string;
@@ -293,7 +296,7 @@ export function getProductReviews(productId: number) {
   );
 }
 
-export function getAllProductSlugs() {
+export async function getAllProductSlugs() {
   return all<{ slug: string; updated_at: string }>(
     `SELECT slug, updated_at FROM products WHERE ${PUBLIC_PRODUCT_BARE}`,
   );
@@ -306,7 +309,7 @@ export function getAllProductSlugs() {
 // Memoized per request: the site layout reads this for the mega-menu on
 // every page, and the products page reads it again for its own category
 // rail — same request, same answer, one query instead of two.
-export const getCategories = cache(() => {
+export const getCategories = cache(async () => {
   return all<{
     id: number;
     name: string;
@@ -323,7 +326,7 @@ export const getCategories = cache(() => {
   );
 });
 
-export function getMaterials() {
+export async function getMaterials() {
   return all<{ material: string; c: number }>(
     `SELECT material, COUNT(*) AS c FROM products
      WHERE material IS NOT NULL AND ${PUBLIC_PRODUCT_BARE}
@@ -331,7 +334,7 @@ export function getMaterials() {
   );
 }
 
-export function getTechnologies() {
+export async function getTechnologies() {
   return all<{ print_technology: string; c: number }>(
     `SELECT print_technology, COUNT(*) AS c FROM products
      WHERE print_technology IS NOT NULL AND ${PUBLIC_PRODUCT_BARE}
@@ -343,7 +346,7 @@ export function getTechnologies() {
    Content
    ============================================================ */
 
-export function getTestimonials(limit = 6) {
+export async function getTestimonials(limit = 6) {
   return all<{
     id: number;
     author_name: string;
@@ -359,7 +362,7 @@ export function getTestimonials(limit = 6) {
   );
 }
 
-export function getGalleryItems(limit = 24, category?: string) {
+export async function getGalleryItems(limit = 24, category?: string) {
   return all<{
     id: number;
     title: string | null;
@@ -379,14 +382,14 @@ export function getGalleryItems(limit = 24, category?: string) {
   );
 }
 
-export function getGalleryCategories() {
+export async function getGalleryCategories() {
   return all<{ category: string }>(
     `SELECT DISTINCT category FROM gallery_items
      WHERE category IS NOT NULL AND is_active = 1 ORDER BY category`,
   );
 }
 
-export function getVideos(limit = 24) {
+export async function getVideos(limit = 24) {
   return all<{
     id: number;
     title: string;
@@ -402,7 +405,7 @@ export function getVideos(limit = 24) {
   );
 }
 
-export function getBlogPosts(limit = 12, offset = 0) {
+export async function getBlogPosts(limit = 12, offset = 0) {
   return all<{
     id: number;
     title: string;
@@ -421,7 +424,7 @@ export function getBlogPosts(limit = 12, offset = 0) {
   );
 }
 
-export function getBlogPostBySlug(slug: string) {
+export async function getBlogPostBySlug(slug: string) {
   return one<{
     id: number;
     title: string;
@@ -445,7 +448,7 @@ export function getBlogPostBySlug(slug: string) {
   );
 }
 
-export function getFaqs() {
+export async function getFaqs() {
   return all<{ id: number; question: string; answer: string; category: string | null }>(
     `SELECT id, question, answer, category FROM faqs WHERE is_active = 1 ORDER BY sort_order`,
   );
@@ -455,7 +458,7 @@ export function getFaqs() {
 // that also need a setting directly (quote rates, hero playback, admin
 // settings) were each triggering a second identical table scan on the same
 // request. `cache()` collapses all of them into one.
-export const getSettings = cache((): Record<string, string> => {
-  const rows = all<{ key: string; value: string | null }>(`SELECT key, value FROM settings`);
+export const getSettings = cache(async (): Promise<Record<string, string>> => {
+  const rows = await all<{ key: string; value: string | null }>(`SELECT \`key\`, value FROM settings`);
   return Object.fromEntries(rows.map((r) => [r.key, r.value ?? '']));
 });

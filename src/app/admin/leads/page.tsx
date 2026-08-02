@@ -21,7 +21,7 @@ export default async function AdminLeadsPage({
   const { status } = await searchParams;
 
   const validStatus = LEAD_STATUSES.includes(status as never) ? status : undefined;
-  const leads = listAdminLeads(validStatus);
+  const leads = await listAdminLeads(validStatus);
   const editable = can(user.role, 'leads.edit');
 
   return (

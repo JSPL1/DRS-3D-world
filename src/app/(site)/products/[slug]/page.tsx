@@ -24,7 +24,8 @@ import { site } from '@/lib/site';
 export const dynamic = 'force-dynamic';
 
 export async function generateStaticParams() {
-  return getAllProductSlugs().map((p) => ({ slug: p.slug }));
+  const slugs = await getAllProductSlugs();
+  return slugs.map((p) => ({ slug: p.slug }));
 }
 
 export async function generateMetadata({
@@ -33,7 +34,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
   if (!product) return { title: 'Product not found' };
 
   return {
@@ -50,19 +51,19 @@ export async function generateMetadata({
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const gallery = getProductImages(product.id, 'gallery');
-  const spin = getProductImages(product.id, '360');
-  const related = getRelatedProducts(product.id, 3);
-  const reviews = getProductReviews(product.id);
-  const colors = getProductColors(product.id);
+  const gallery = await getProductImages(product.id, 'gallery');
+  const spin = await getProductImages(product.id, '360');
+  const related = await getRelatedProducts(product.id, 3);
+  const reviews = await getProductReviews(product.id);
+  const colors = await getProductColors(product.id);
 
   const user = await getCurrentUser();
   const wishlisted = user
     ? new Set(
-        all<{ product_id: number }>(`SELECT product_id FROM wishlists WHERE user_id = ?`, [user.id])
+        (await all<{ product_id: number }>(`SELECT product_id FROM wishlists WHERE user_id = ?`, [user.id]))
           .map((r) => r.product_id),
       )
     : new Set<number>();

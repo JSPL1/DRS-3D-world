@@ -35,16 +35,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request.' }, { status: 400 });
   }
 
-  const target = one<{ id: number; name: string }>(`SELECT id, name FROM users WHERE id = ?`, [id]);
+  const target = await one<{ id: number; name: string }>(`SELECT id, name FROM users WHERE id = ?`, [id]);
   if (!target) {
     return NextResponse.json({ error: 'That account no longer exists.' }, { status: 404 });
   }
 
   const hash = bcrypt.hashSync(parsed.data.password, 10);
-  run(`UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE id = ?`, [hash, id]);
+  await run(`UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE id = ?`, [hash, id]);
 
   // Never log the password itself — only that it changed and who did it.
-  logActivity(user.id, user.name, 'set a new password for', 'user', id, target.name);
+  await logActivity(user.id, user.name, 'set a new password for', 'user', id, target.name);
 
   return NextResponse.json({ ok: true });
 }

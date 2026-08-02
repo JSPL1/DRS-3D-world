@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
   }
 
-  const config = getMailConfig();
+  const config = await getMailConfig();
   if (!config) {
     return NextResponse.json(
       { error: 'Fill in the SMTP server, username and password above, save, then try again.' },

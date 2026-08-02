@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
  * the right image regardless of what the link tags say.
  */
 export async function GET() {
-  const branding = getBranding();
+  const branding = await getBranding();
   const icon = branding.faviconUrl;
 
   // Only ever read from inside public/ — the value comes from the database

@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAdmin();
-  const branding = getBranding();
+  const branding = await getBranding();
 
   return (
     <div className="min-h-dvh bg-ink-950">

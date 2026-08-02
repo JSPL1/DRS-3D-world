@@ -18,15 +18,15 @@ export const metadata = { title: 'Dashboard' };
 export default async function AdminDashboard() {
   const user = await requirePermission('dashboard.view');
 
-  const stats = getDashboardStats();
-  const revenue = getRevenueSeries(30);
-  const visitors = getVisitorSeries(30);
-  const statusBreakdown = getOrderStatusBreakdown();
-  const topProducts = getTopProducts(6);
-  const categories = getCategoryBreakdown();
-  const traffic = getTrafficByPath(7);
-  const recentOrders = getRecentOrders(7);
-  const activity = getActivityFeed(8);
+  const stats = await getDashboardStats();
+  const revenue = await getRevenueSeries(30);
+  const visitors = await getVisitorSeries(30);
+  const statusBreakdown = await getOrderStatusBreakdown();
+  const topProducts = await getTopProducts(6);
+  const categories = await getCategoryBreakdown();
+  const traffic = await getTrafficByPath(7);
+  const recentOrders = await getRecentOrders(7);
+  const activity = await getActivityFeed(8);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';

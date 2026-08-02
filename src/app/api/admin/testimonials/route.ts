@@ -22,9 +22,9 @@ const schema = z.object({
   linkedUserId: z.number().int().positive().nullable().optional(),
 });
 
-function resolveAvatar(input: z.infer<typeof schema>): string | null {
+async function resolveAvatar(input: z.infer<typeof schema>): Promise<string | null> {
   if (input.linkedUserId) {
-    const user = one<{ avatar_url: string | null }>(
+    const user = await one<{ avatar_url: string | null }>(
       `SELECT avatar_url FROM users WHERE id = ?`,
       [input.linkedUserId],
     );
@@ -43,17 +43,17 @@ export async function POST(req: Request) {
   }
   const t = parsed.data;
 
-  const result = run(
+  const result = await run(
     `INSERT INTO testimonials (author_name, author_role, company, avatar_url, quote, rating,
                                is_featured, is_active, sort_order)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM testimonials))`,
     [
-      t.authorName, t.authorRole || null, t.company || null, resolveAvatar(t),
+      t.authorName, t.authorRole || null, t.company || null, await resolveAvatar(t),
       t.quote, t.rating, t.isFeatured ? 1 : 0, t.isActive ? 1 : 0,
     ],
   );
 
-  logActivity(user.id, user.name, 'added testimonial', 'testimonial', Number(result.lastInsertRowid), t.authorName);
+  await logActivity(user.id, user.name, 'added testimonial', 'testimonial', Number(result.lastInsertRowid), t.authorName);
   revalidatePath('/');
 
   return NextResponse.json({ ok: true, id: Number(result.lastInsertRowid) });
@@ -72,13 +72,13 @@ export async function PATCH(req: Request) {
   }
   const t = parsed.data;
 
-  const result = run(
+  const result = await run(
     `UPDATE testimonials
      SET author_name = ?, author_role = ?, company = ?, avatar_url = ?, quote = ?,
          rating = ?, is_featured = ?, is_active = ?
      WHERE id = ?`,
     [
-      t.authorName, t.authorRole || null, t.company || null, resolveAvatar(t),
+      t.authorName, t.authorRole || null, t.company || null, await resolveAvatar(t),
       t.quote, t.rating, t.isFeatured ? 1 : 0, t.isActive ? 1 : 0, t.id,
     ],
   );
@@ -87,7 +87,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Testimonial not found.' }, { status: 404 });
   }
 
-  logActivity(user.id, user.name, 'updated testimonial', 'testimonial', t.id, t.authorName);
+  await logActivity(user.id, user.name, 'updated testimonial', 'testimonial', t.id, t.authorName);
   revalidatePath('/');
 
   return NextResponse.json({ ok: true });
@@ -102,14 +102,14 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Invalid id.' }, { status: 400 });
   }
 
-  const existing = one<{ author_name: string }>(
+  const existing = await one<{ author_name: string }>(
     `SELECT author_name FROM testimonials WHERE id = ?`,
     [id],
   );
   if (!existing) return NextResponse.json({ error: 'Testimonial not found.' }, { status: 404 });
 
-  run(`DELETE FROM testimonials WHERE id = ?`, [id]);
-  logActivity(user.id, user.name, 'deleted testimonial', 'testimonial', id, existing.author_name);
+  await run(`DELETE FROM testimonials WHERE id = ?`, [id]);
+  await logActivity(user.id, user.name, 'deleted testimonial', 'testimonial', id, existing.author_name);
   revalidatePath('/');
 
   return NextResponse.json({ ok: true });

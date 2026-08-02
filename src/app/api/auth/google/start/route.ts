@@ -11,7 +11,7 @@ export const runtime = 'nodejs';
  * into Settings → Integrations — same "not configured" pattern as SMTP.
  */
 export async function GET(req: Request) {
-  const settings = getSettings();
+  const settings = await getSettings();
   const clientId = settings.oauth_google_client_id;
 
   if (!clientId) {

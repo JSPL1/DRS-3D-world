@@ -7,7 +7,7 @@ export const metadata = { title: 'Activity log' };
 export default async function AdminActivityPage() {
   await requirePermission('activity.view');
 
-  const entries = all<{
+  const entries = await all<{
     id: number;
     actor_name: string | null;
     action: string;

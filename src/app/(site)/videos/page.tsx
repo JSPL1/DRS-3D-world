@@ -23,8 +23,8 @@ const duration = (seconds: number | null) => {
   return `${m}:${String(s).padStart(2, '0')}`;
 };
 
-export default function VideosPage() {
-  const videos = getVideos(30);
+export default async function VideosPage() {
+  const videos = await getVideos(30);
 
   return (
     <div className="pb-24 pt-36">

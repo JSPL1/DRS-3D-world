@@ -70,16 +70,16 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
     offset: (page - 1) * PAGE_SIZE,
   };
 
-  const { items, total } = getProducts(filters);
-  const colorCounts = getColorCounts();
-  const categories = getCategories();
-  const materials = getMaterials();
-  const technologies = getTechnologies();
+  const { items, total } = await getProducts(filters);
+  const colorCounts = await getColorCounts();
+  const categories = await getCategories();
+  const materials = await getMaterials();
+  const technologies = await getTechnologies();
 
   const user = await getCurrentUser();
   const wishlisted = user
     ? new Set(
-        all<{ product_id: number }>(`SELECT product_id FROM wishlists WHERE user_id = ?`, [user.id])
+        (await all<{ product_id: number }>(`SELECT product_id FROM wishlists WHERE user_id = ?`, [user.id]))
           .map((r) => r.product_id),
       )
     : new Set<number>();

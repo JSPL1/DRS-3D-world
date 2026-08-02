@@ -15,8 +15,8 @@ export const metadata: Metadata = {
 // change effectively never reach visitors.
 export const dynamic = 'force-dynamic';
 
-export default function FaqPage() {
-  const faqs = getFaqs();
+export default async function FaqPage() {
+  const faqs = await getFaqs();
 
   const grouped = faqs.reduce<Record<string, typeof faqs>>((acc, faq) => {
     const key = faq.category ?? 'General';

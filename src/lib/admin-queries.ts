@@ -26,37 +26,37 @@ function delta(current: number, previous: number): number {
   return Math.round(((current - previous) / previous) * 100);
 }
 
-export function getDashboardStats(): DashboardStats {
-  const ordersToday = count(
-    `SELECT COUNT(*) AS c FROM orders WHERE date(created_at) = date('now')`,
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const ordersToday = await count(
+    `SELECT COUNT(*) AS c FROM orders WHERE DATE(created_at) = CURDATE()`,
   );
-  const ordersYesterday = count(
-    `SELECT COUNT(*) AS c FROM orders WHERE date(created_at) = date('now', '-1 day')`,
+  const ordersYesterday = await count(
+    `SELECT COUNT(*) AS c FROM orders WHERE DATE(created_at) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`,
   );
 
   const revenueMonth =
-    one<{ v: number }>(
+    (await one<{ v: number }>(
       `SELECT COALESCE(SUM(total), 0) AS v FROM orders
        WHERE status NOT IN ('cancelled', 'refunded')
-         AND created_at >= datetime('now', '-30 days')`,
-    )?.v ?? 0;
+         AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)`,
+    ))?.v ?? 0;
 
   const revenuePrevMonth =
-    one<{ v: number }>(
+    (await one<{ v: number }>(
       `SELECT COALESCE(SUM(total), 0) AS v FROM orders
        WHERE status NOT IN ('cancelled', 'refunded')
-         AND created_at >= datetime('now', '-60 days')
-         AND created_at < datetime('now', '-30 days')`,
-    )?.v ?? 0;
+         AND created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY)
+         AND created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`,
+    ))?.v ?? 0;
 
-  const visitors30d = count(
+  const visitors30d = await count(
     `SELECT COUNT(DISTINCT session_id) AS c FROM page_views
-     WHERE created_at >= datetime('now', '-30 days')`,
+     WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)`,
   );
-  const visitorsPrev = count(
+  const visitorsPrev = await count(
     `SELECT COUNT(DISTINCT session_id) AS c FROM page_views
-     WHERE created_at >= datetime('now', '-60 days')
-       AND created_at < datetime('now', '-30 days')`,
+     WHERE created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY)
+       AND created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`,
   );
 
   return {
@@ -64,28 +64,28 @@ export function getDashboardStats(): DashboardStats {
     ordersTodayDelta: delta(ordersToday, ordersYesterday),
     revenueMonth,
     revenueMonthDelta: delta(revenueMonth, revenuePrevMonth),
-    pendingOrders: count(
+    pendingOrders: await count(
       `SELECT COUNT(*) AS c FROM orders WHERE status IN ('pending','confirmed','printing','post_processing')`,
     ),
-    completedOrders: count(`SELECT COUNT(*) AS c FROM orders WHERE status = 'completed'`),
-    productCount: count(`SELECT COUNT(*) AS c FROM products WHERE status = 'published'`),
-    newLeads: count(`SELECT COUNT(*) AS c FROM leads WHERE status = 'new'`),
-    openQuotes: count(`SELECT COUNT(*) AS c FROM quotes WHERE status IN ('new','reviewed','sent')`),
+    completedOrders: await count(`SELECT COUNT(*) AS c FROM orders WHERE status = 'completed'`),
+    productCount: await count(`SELECT COUNT(*) AS c FROM products WHERE status = 'published'`),
+    newLeads: await count(`SELECT COUNT(*) AS c FROM leads WHERE status = 'new'`),
+    openQuotes: await count(`SELECT COUNT(*) AS c FROM quotes WHERE status IN ('new','reviewed','sent')`),
     visitors30d,
     visitorsDelta: delta(visitors30d, visitorsPrev),
   };
 }
 
 /** Revenue and order count per day for the last N days, zero-filled. */
-export function getRevenueSeries(days = 30) {
-  const rows = all<{ day: string; revenue: number; orders: number }>(
-    `SELECT date(created_at) AS day,
+export async function getRevenueSeries(days = 30) {
+  const rows = await all<{ day: string; revenue: number; orders: number }>(
+    `SELECT DATE(created_at) AS day,
             COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','refunded') THEN total ELSE 0 END), 0) AS revenue,
             COUNT(*) AS orders
      FROM orders
-     WHERE created_at >= datetime('now', ?)
+     WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
      GROUP BY day ORDER BY day`,
-    [`-${days} days`],
+    [days],
   );
 
   const byDay = new Map(rows.map((r) => [r.day, r]));
@@ -107,12 +107,12 @@ export function getRevenueSeries(days = 30) {
   return series;
 }
 
-export function getVisitorSeries(days = 30) {
-  const rows = all<{ day: string; views: number; visitors: number }>(
-    `SELECT date(created_at) AS day, COUNT(*) AS views, COUNT(DISTINCT session_id) AS visitors
-     FROM page_views WHERE created_at >= datetime('now', ?)
+export async function getVisitorSeries(days = 30) {
+  const rows = await all<{ day: string; views: number; visitors: number }>(
+    `SELECT DATE(created_at) AS day, COUNT(*) AS views, COUNT(DISTINCT session_id) AS visitors
+     FROM page_views WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
      GROUP BY day ORDER BY day`,
-    [`-${days} days`],
+    [days],
   );
 
   const byDay = new Map(rows.map((r) => [r.day, r]));
@@ -131,14 +131,14 @@ export function getVisitorSeries(days = 30) {
   return series;
 }
 
-export function getOrderStatusBreakdown() {
+export async function getOrderStatusBreakdown() {
   return all<{ status: string; c: number; value: number }>(
     `SELECT status, COUNT(*) AS c, COALESCE(SUM(total), 0) AS value
      FROM orders GROUP BY status ORDER BY c DESC`,
   );
 }
 
-export function getTopProducts(limit = 6) {
+export async function getTopProducts(limit = 6) {
   return all<{ name: string; units: number; revenue: number }>(
     `SELECT oi.product_name AS name,
             SUM(oi.quantity) AS units,
@@ -152,7 +152,7 @@ export function getTopProducts(limit = 6) {
   );
 }
 
-export function getCategoryBreakdown() {
+export async function getCategoryBreakdown() {
   return all<{ name: string; c: number }>(
     `SELECT COALESCE(c.name, 'Uncategorised') AS name, COUNT(p.id) AS c
      FROM products p LEFT JOIN categories c ON c.id = p.category_id
@@ -161,19 +161,19 @@ export function getCategoryBreakdown() {
   );
 }
 
-export function getTrafficByPath(limit = 8) {
+export async function getTrafficByPath(limit = 8) {
   return all<{ path: string; views: number }>(
     `SELECT path, COUNT(*) AS views FROM page_views
-     WHERE created_at >= datetime('now', '-30 days')
+     WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
      GROUP BY path ORDER BY views DESC LIMIT ?`,
     [limit],
   );
 }
 
-export function getDeviceBreakdown() {
+export async function getDeviceBreakdown() {
   return all<{ device: string; c: number }>(
     `SELECT device, COUNT(*) AS c FROM page_views
-     WHERE created_at >= datetime('now', '-30 days') AND device IS NOT NULL
+     WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) AND device IS NOT NULL
      GROUP BY device`,
   );
 }
@@ -182,7 +182,7 @@ export function getDeviceBreakdown() {
    Feeds
    ============================================================ */
 
-export function getRecentOrders(limit = 8) {
+export async function getRecentOrders(limit = 8) {
   return all<{
     id: number;
     order_number: string;
@@ -198,7 +198,7 @@ export function getRecentOrders(limit = 8) {
   );
 }
 
-export function getActivityFeed(limit = 10) {
+export async function getActivityFeed(limit = 10) {
   return all<{
     id: number;
     actor_name: string | null;
@@ -213,7 +213,7 @@ export function getActivityFeed(limit = 10) {
   );
 }
 
-export function getNotifications(limit = 12) {
+export async function getNotifications(limit = 12) {
   return all<{
     id: number;
     title: string;
@@ -229,7 +229,7 @@ export function getNotifications(limit = 12) {
   );
 }
 
-export function getUnreadNotificationCount() {
+export async function getUnreadNotificationCount() {
   return count(`SELECT COUNT(*) AS c FROM notifications WHERE is_read = 0`);
 }
 
@@ -237,7 +237,7 @@ export function getUnreadNotificationCount() {
    Module listings
    ============================================================ */
 
-export function listAdminProducts(search?: string, limit = 60) {
+export async function listAdminProducts(search?: string, limit = 60) {
   return all<{
     id: number;
     name: string;
@@ -270,7 +270,7 @@ export function listAdminProducts(search?: string, limit = 60) {
   );
 }
 
-export function listAdminOrders(status?: string, limit = 80) {
+export async function listAdminOrders(status?: string, limit = 80) {
   return all<{
     id: number;
     order_number: string;
@@ -294,7 +294,7 @@ export function listAdminOrders(status?: string, limit = 80) {
 }
 
 /** Batched — one query for every order on the page, not one query per row. */
-export function listOrderItemsForOrders(orderIds: number[]) {
+export async function listOrderItemsForOrders(orderIds: number[]) {
   if (orderIds.length === 0) return [];
   const placeholders = orderIds.map(() => '?').join(',');
   return all<{
@@ -313,7 +313,7 @@ export function listOrderItemsForOrders(orderIds: number[]) {
   );
 }
 
-export function listAdminLeads(status?: string, limit = 80) {
+export async function listAdminLeads(status?: string, limit = 80) {
   return all<{
     id: number;
     name: string;
@@ -332,7 +332,7 @@ export function listAdminLeads(status?: string, limit = 80) {
   );
 }
 
-export function listAdminQuotes(limit = 80) {
+export async function listAdminQuotes(limit = 80) {
   return all<{
     id: number;
     reference: string;
@@ -357,7 +357,7 @@ export type AdminUserFilters = {
   status?: string;
 };
 
-export function listAdminUsers(filters: AdminUserFilters = {}) {
+export async function listAdminUsers(filters: AdminUserFilters = {}) {
   const where: string[] = [];
   const params: unknown[] = [];
 
@@ -399,7 +399,7 @@ export function listAdminUsers(filters: AdminUserFilters = {}) {
   );
 }
 
-export function listAdminCategories() {
+export async function listAdminCategories() {
   return all<{
     id: number;
     name: string;
@@ -414,7 +414,7 @@ export function listAdminCategories() {
   );
 }
 
-export function listAdminCoupons() {
+export async function listAdminCoupons() {
   return all<{
     id: number;
     code: string;
@@ -431,7 +431,7 @@ export function listAdminCoupons() {
   }>(`SELECT * FROM coupons ORDER BY created_at DESC`);
 }
 
-export function listAdminReviews() {
+export async function listAdminReviews() {
   return all<{
     id: number;
     author_name: string;

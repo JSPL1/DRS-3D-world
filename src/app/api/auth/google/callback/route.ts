@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 
 import { canAccessAdmin } from '@/lib/auth/roles';
 import { createSession, logActivity } from '@/lib/auth/session';
-import { getDb, one, run } from '@/lib/db';
+import { one, run } from '@/lib/db';
 import { getSettings } from '@/lib/queries';
 
 export const runtime = 'nodejs';
@@ -23,7 +23,7 @@ export async function GET(req: Request) {
   const failTo = (reason: string) =>
     NextResponse.redirect(new URL(`/login?error=${reason}`, url));
 
-  const settings = getSettings();
+  const settings = await getSettings();
   const clientId = settings.oauth_google_client_id;
   const clientSecret = settings.oauth_google_client_secret;
   if (!clientId || !clientSecret) return failTo('google_not_configured');
@@ -73,30 +73,27 @@ export async function GET(req: Request) {
   const info = (await infoRes.json()) as GoogleUserInfo;
   if (!info.email) return failTo('google_failed');
 
-  const db = getDb();
-
   // Link by Google id first (repeat sign-in), then fall back to a matching
   // email (first time via Google, but the account already exists from a
   // normal sign-up) — never create a second account for the same address.
-  let user = one<{
+  let user = await one<{
     id: number; name: string; email: string; role: string; status: string; token_version: number;
   }>(`SELECT id, name, email, role, status, token_version FROM users WHERE oauth_google_id = ?`, [info.sub]);
 
   if (!user) {
-    const existing = one<{ id: number }>(`SELECT id FROM users WHERE email = ?`, [info.email.toLowerCase()]);
+    const existing = await one<{ id: number }>(`SELECT id FROM users WHERE email = ?`, [info.email.toLowerCase()]);
     if (existing) {
-      run(`UPDATE users SET oauth_google_id = ? WHERE id = ?`, [info.sub, existing.id]);
+      await run(`UPDATE users SET oauth_google_id = ? WHERE id = ?`, [info.sub, existing.id]);
     } else {
       const randomPassword = bcrypt.hashSync(randomBytes(24).toString('hex'), 10);
-      const result = db
-        .prepare(
-          `INSERT INTO users (name, email, password_hash, role, status, oauth_google_id, email_verified_at)
-           VALUES (?, ?, ?, 'customer', 'active', ?, datetime('now'))`,
-        )
-        .run(info.name || info.email, info.email.toLowerCase(), randomPassword, info.sub);
-      run(`UPDATE users SET oauth_google_id = ? WHERE id = ?`, [info.sub, Number(result.lastInsertRowid)]);
+      const result = await run(
+        `INSERT INTO users (name, email, password_hash, role, status, oauth_google_id, email_verified_at)
+         VALUES (?, ?, ?, 'customer', 'active', ?, NOW())`,
+        [info.name || info.email, info.email.toLowerCase(), randomPassword, info.sub],
+      );
+      await run(`UPDATE users SET oauth_google_id = ? WHERE id = ?`, [info.sub, Number(result.lastInsertRowid)]);
     }
-    user = one<{
+    user = await one<{
       id: number; name: string; email: string; role: string; status: string; token_version: number;
     }>(`SELECT id, name, email, role, status, token_version FROM users WHERE oauth_google_id = ?`, [info.sub]);
   }
@@ -107,7 +104,7 @@ export async function GET(req: Request) {
     { id: user.id, name: user.name, email: user.email, role: user.role as never, token_version: user.token_version },
     true,
   );
-  logActivity(user.id, user.name, 'signed in with Google', 'user', user.id, 'OAuth sign-in');
+  await logActivity(user.id, user.name, 'signed in with Google', 'user', user.id, 'OAuth sign-in');
 
   const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : null;
   const res = NextResponse.redirect(

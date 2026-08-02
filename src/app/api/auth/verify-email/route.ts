@@ -27,7 +27,7 @@ type PendingUser = {
   token_version: number;
 };
 
-function findPending(email: string) {
+async function findPending(email: string) {
   return one<PendingUser>(
     `SELECT id, name, email, role, status, token_version FROM users WHERE email = ?`,
     [email],
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
   }
 
-  const user = findPending(parsed.data.email);
+  const user = await findPending(parsed.data.email);
 
   // Same message whether the address is unknown or the code is wrong, so this
   // endpoint can't be used to discover which addresses have accounts.
@@ -64,25 +64,25 @@ export async function POST(req: Request) {
     );
   }
 
-  const result = consumeOtp(user.id, 'email_verify', parsed.data.code);
+  const result = await consumeOtp(user.id, 'email_verify', parsed.data.code);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
 
-  run(
-    `UPDATE users SET status = 'active', email_verified_at = datetime('now'),
-                      updated_at = datetime('now')
+  await run(
+    `UPDATE users SET status = 'active', email_verified_at = NOW(),
+                      updated_at = NOW()
      WHERE id = ?`,
     [user.id],
   );
 
   // Any guest order already placed with this address belongs to the account
   // now — otherwise the customer's first order is invisible to them.
-  const claimed = run(
-    `UPDATE orders SET user_id = ? WHERE user_id IS NULL AND lower(customer_email) = ?`,
+  const claimed = await run(
+    `UPDATE orders SET user_id = ? WHERE user_id IS NULL AND LOWER(customer_email) = ?`,
     [user.id, user.email],
   );
 
   await createSession({ ...user, role: user.role }, true);
-  logActivity(user.id, user.name, 'verified email', 'user', user.id, `Verified from ${ip}`);
+  await logActivity(user.id, user.name, 'verified email', 'user', user.id, `Verified from ${ip}`);
 
   return NextResponse.json({
     ok: true,
@@ -107,7 +107,7 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
   }
 
-  const user = findPending(parsed.data.email);
+  const user = await findPending(parsed.data.email);
   const code = user && user.status === 'pending' ? await issueOtp(user, 'email_verify') : null;
 
   // Unconditionally the same response: a verified address and an unknown one

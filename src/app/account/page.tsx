@@ -34,14 +34,14 @@ function tierFor(points: number) {
 export default async function AccountPage() {
   const user = await requireUser();
 
-  const loyalty = one<{ loyalty_points: number }>(
+  const loyalty = await one<{ loyalty_points: number }>(
     `SELECT loyalty_points FROM users WHERE id = ?`,
     [user.id],
   );
   const points = loyalty?.loyalty_points ?? 0;
   const { tier, next } = tierFor(points);
 
-  const orders = all<{
+  const orders = await all<{
     id: number;
     order_number: string;
     total: number;
@@ -56,7 +56,7 @@ export default async function AccountPage() {
     [user.id, user.email],
   );
 
-  const quotes = all<{
+  const quotes = await all<{
     id: number;
     reference: string;
     material: string | null;
@@ -71,18 +71,17 @@ export default async function AccountPage() {
     [user.id, user.email],
   );
 
-  const wishlistSlugs = all<{ slug: string }>(
+  const wishlistRows = await all<{ slug: string }>(
     `SELECT p.slug FROM wishlists w
      JOIN products p ON p.id = w.product_id
      WHERE w.user_id = ? AND p.status = 'published'
      ORDER BY w.created_at DESC`,
     [user.id],
-  ).map((r) => r.slug);
-  const wishlist = wishlistSlugs
-    .map((slug) => getProductBySlug(slug))
-    .filter((p): p is NonNullable<typeof p> => p !== null);
+  );
+  const wishlistProducts = await Promise.all(wishlistRows.map((r) => getProductBySlug(r.slug)));
+  const wishlist = wishlistProducts.filter((p): p is NonNullable<typeof p> => p !== null);
 
-  const colorCounts = getColorCounts();
+  const colorCounts = await getColorCounts();
 
   return (
     <div className="min-h-dvh bg-[var(--bg)]">

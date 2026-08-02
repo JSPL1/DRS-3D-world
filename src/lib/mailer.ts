@@ -35,8 +35,8 @@ export type MailConfig = {
   fromAddress: string;
 };
 
-export function getMailConfig(): MailConfig | null {
-  const s = getSettings();
+export async function getMailConfig(): Promise<MailConfig | null> {
+  const s = await getSettings();
 
   const host = (process.env.SMTP_HOST ?? s.smtp_host ?? '').trim();
   const user = (process.env.SMTP_USER ?? s.smtp_user ?? '').trim();
@@ -59,8 +59,8 @@ export function getMailConfig(): MailConfig | null {
 }
 
 /** Whether anything can be sent at all. */
-export function isMailConfigured(): boolean {
-  return getMailConfig() !== null;
+export async function isMailConfigured(): Promise<boolean> {
+  return (await getMailConfig()) !== null;
 }
 
 /**
@@ -107,7 +107,7 @@ export type SendResult = { ok: true; messageId: string } | { ok: false; error: s
  * administrator exactly why a test message did not arrive.
  */
 export async function sendMail(mail: Mail): Promise<SendResult> {
-  const config = getMailConfig();
+  const config = await getMailConfig();
 
   if (!config) {
     const error =

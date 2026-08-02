@@ -56,7 +56,7 @@ export async function POST(req: Request) {
 
   // Recalculated server-side from the submitted geometry: the browser's figure
   // is for display, this one is what we store and act on.
-  const settings = getSettings();
+  const settings = await getSettings();
   const num = (key: string, fallback: number) => {
     const value = Number(settings[key]);
     return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -85,13 +85,13 @@ export async function POST(req: Request) {
   });
 
   // Sequential, human-readable reference.
-  const last = one<{ reference: string }>(
+  const last = await one<{ reference: string }>(
     `SELECT reference FROM quotes ORDER BY id DESC LIMIT 1`,
   );
   const nextNumber = last ? Number(last.reference.replace(/\D/g, '')) + 1 : 24900;
   const reference = `QT-${nextNumber}`;
 
-  run(
+  await run(
     `INSERT INTO quotes (
        reference, customer_name, customer_email, customer_phone, file_name,
        volume_cm3, bbox_x_mm, bbox_y_mm, bbox_z_mm, triangle_count, surface_area_cm2,
@@ -131,7 +131,7 @@ export async function POST(req: Request) {
     ],
   );
 
-  run(
+  await run(
     `INSERT INTO notifications (title, body, type, href)
      VALUES (?, ?, 'quote', '/admin/quotes')`,
     [

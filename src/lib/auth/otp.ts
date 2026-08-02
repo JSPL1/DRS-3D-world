@@ -39,15 +39,15 @@ export async function issueOtp(
   const code = generateCode();
 
   // One live code per user per purpose, so an old email can't be replayed.
-  run(
-    `UPDATE otp_codes SET consumed_at = datetime('now')
+  await run(
+    `UPDATE otp_codes SET consumed_at = NOW()
      WHERE user_id = ? AND purpose = ? AND consumed_at IS NULL`,
     [user.id, purpose],
   );
-  run(
+  await run(
     `INSERT INTO otp_codes (user_id, code_hash, purpose, expires_at)
-     VALUES (?, ?, ?, datetime('now', ?))`,
-    [user.id, bcrypt.hashSync(code, 10), purpose, `+${OTP_TTL_MINUTES} minutes`],
+     VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE))`,
+    [user.id, bcrypt.hashSync(code, 10), purpose, OTP_TTL_MINUTES],
   );
 
   // The email says "confirm your address" or "reset your password" depending
@@ -65,25 +65,25 @@ export type OtpResult =
   | { ok: false; error: string };
 
 /** Consumes the code on success; counts the attempt on failure. */
-export function consumeOtp(userId: number, purpose: OtpPurpose, code: string): OtpResult {
+export async function consumeOtp(userId: number, purpose: OtpPurpose, code: string): Promise<OtpResult> {
   const invalid = { ok: false as const, error: 'That code is not valid or has expired.' };
 
-  const otp = one<{ id: number; code_hash: string; attempts: number }>(
+  const otp = await one<{ id: number; code_hash: string; attempts: number }>(
     `SELECT id, code_hash, attempts FROM otp_codes
      WHERE user_id = ? AND purpose = ?
-       AND consumed_at IS NULL AND expires_at > datetime('now')
+       AND consumed_at IS NULL AND expires_at > NOW()
      ORDER BY id DESC LIMIT 1`,
     [userId, purpose],
   );
   if (!otp) return invalid;
 
   if (otp.attempts >= OTP_MAX_ATTEMPTS) {
-    run(`UPDATE otp_codes SET consumed_at = datetime('now') WHERE id = ?`, [otp.id]);
+    await run(`UPDATE otp_codes SET consumed_at = NOW() WHERE id = ?`, [otp.id]);
     return { ok: false, error: 'Too many incorrect attempts. Please request a new code.' };
   }
 
   if (!bcrypt.compareSync(code, otp.code_hash)) {
-    run(`UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ?`, [otp.id]);
+    await run(`UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ?`, [otp.id]);
     const left = OTP_MAX_ATTEMPTS - otp.attempts - 1;
     return {
       ok: false,
@@ -91,7 +91,7 @@ export function consumeOtp(userId: number, purpose: OtpPurpose, code: string): O
     };
   }
 
-  run(`UPDATE otp_codes SET consumed_at = datetime('now') WHERE id = ?`, [otp.id]);
+  await run(`UPDATE otp_codes SET consumed_at = NOW() WHERE id = ?`, [otp.id]);
   return { ok: true };
 }
 

@@ -11,14 +11,14 @@ export const metadata = { title: 'Analytics' };
 export default async function AdminAnalyticsPage() {
   await requirePermission('analytics.view');
 
-  const stats = getDashboardStats();
-  const revenue = getRevenueSeries(30);
-  const visitors = getVisitorSeries(30);
-  const statuses = getOrderStatusBreakdown();
-  const topProducts = getTopProducts(8);
-  const categories = getCategoryBreakdown();
-  const traffic = getTrafficByPath(10);
-  const devices = getDeviceBreakdown();
+  const stats = await getDashboardStats();
+  const revenue = await getRevenueSeries(30);
+  const visitors = await getVisitorSeries(30);
+  const statuses = await getOrderStatusBreakdown();
+  const topProducts = await getTopProducts(8);
+  const categories = await getCategoryBreakdown();
+  const traffic = await getTrafficByPath(10);
+  const devices = await getDeviceBreakdown();
 
   const totalOrders = statuses.reduce((s, r) => s + r.c, 0);
   const totalViews = visitors.reduce((s, d) => s + d.views, 0);

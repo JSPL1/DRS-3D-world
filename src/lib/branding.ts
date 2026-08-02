@@ -39,8 +39,8 @@ export type Branding = {
  * work to cut on a CPU-throttled host, and safe because the memoization
  * never survives past the one request it was computed for.
  */
-export const getBranding = cache((): Branding => {
-  const settings = getSettings();
+export const getBranding = cache(async (): Promise<Branding> => {
+  const settings = await getSettings();
 
   const theme: Theme = settings.site_theme === 'light' ? 'light' : 'dark';
   const logoUrl = settings.site_logo_url?.trim() || null;

@@ -28,16 +28,16 @@ export async function POST(req: Request) {
   }
   const r = parsed.data;
 
-  const product = one<{ id: number }>(`SELECT id FROM products WHERE id = ?`, [r.productId]);
+  const product = await one<{ id: number }>(`SELECT id FROM products WHERE id = ?`, [r.productId]);
   if (!product) return NextResponse.json({ error: 'That product no longer exists.' }, { status: 404 });
 
-  const result = run(
+  const result = await run(
     `INSERT INTO reviews (product_id, author_name, rating, title, body, is_approved)
      VALUES (?, ?, ?, ?, ?, ?)`,
     [r.productId, r.authorName, r.rating, r.title || null, r.body || null, r.isApproved ? 1 : 0],
   );
 
-  logActivity(user.id, user.name, 'added review', 'review', Number(result.lastInsertRowid), r.authorName);
+  await logActivity(user.id, user.name, 'added review', 'review', Number(result.lastInsertRowid), r.authorName);
   revalidatePath('/products');
   revalidatePath('/admin/reviews');
 
@@ -57,10 +57,10 @@ export async function PATCH(req: Request) {
   }
   const r = parsed.data;
 
-  const product = one<{ id: number }>(`SELECT id FROM products WHERE id = ?`, [r.productId]);
+  const product = await one<{ id: number }>(`SELECT id FROM products WHERE id = ?`, [r.productId]);
   if (!product) return NextResponse.json({ error: 'That product no longer exists.' }, { status: 404 });
 
-  const result = run(
+  const result = await run(
     `UPDATE reviews SET product_id = ?, author_name = ?, rating = ?, title = ?, body = ?, is_approved = ?
      WHERE id = ?`,
     [r.productId, r.authorName, r.rating, r.title || null, r.body || null, r.isApproved ? 1 : 0, r.id],
@@ -70,7 +70,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Review not found.' }, { status: 404 });
   }
 
-  logActivity(user.id, user.name, 'updated review', 'review', r.id, r.authorName);
+  await logActivity(user.id, user.name, 'updated review', 'review', r.id, r.authorName);
   revalidatePath('/products');
   revalidatePath('/admin/reviews');
 
@@ -86,11 +86,11 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Invalid id.' }, { status: 400 });
   }
 
-  const existing = one<{ author_name: string }>(`SELECT author_name FROM reviews WHERE id = ?`, [id]);
+  const existing = await one<{ author_name: string }>(`SELECT author_name FROM reviews WHERE id = ?`, [id]);
   if (!existing) return NextResponse.json({ error: 'Review not found.' }, { status: 404 });
 
-  run(`DELETE FROM reviews WHERE id = ?`, [id]);
-  logActivity(user.id, user.name, 'deleted review', 'review', id, existing.author_name);
+  await run(`DELETE FROM reviews WHERE id = ?`, [id]);
+  await logActivity(user.id, user.name, 'deleted review', 'review', id, existing.author_name);
   revalidatePath('/products');
   revalidatePath('/admin/reviews');
 

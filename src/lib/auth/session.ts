@@ -35,7 +35,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const payload = await verifySession(token);
   if (!payload) return null;
 
-  const row = one<{
+  const row = await one<{
     id: number;
     name: string;
     email: string;
@@ -83,7 +83,7 @@ export async function createSession(
     maxAge: cookieMaxAge(remember),
   });
 
-  run(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`, [user.id]);
+  await run(`UPDATE users SET last_login_at = NOW() WHERE id = ?`, [user.id]);
 }
 
 export async function destroySession() {
@@ -111,7 +111,7 @@ export async function requirePermission(permission: Permission): Promise<Current
   return user;
 }
 
-export function logActivity(
+export async function logActivity(
   userId: number | null,
   actorName: string,
   action: string,
@@ -119,7 +119,7 @@ export function logActivity(
   entityId?: number,
   detail?: string,
 ) {
-  run(
+  await run(
     `INSERT INTO activity_logs (user_id, actor_name, action, entity_type, entity_id, detail)
      VALUES (?, ?, ?, ?, ?, ?)`,
     [userId, actorName, action, entityType ?? null, entityId ?? null, detail ?? null],

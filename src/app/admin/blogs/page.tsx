@@ -8,7 +8,7 @@ export const metadata = { title: 'Blog' };
 export default async function AdminBlogsPage() {
   await requirePermission('blogs.edit');
 
-  const posts = all<{
+  const posts = await all<{
     id: number;
     title: string;
     slug: string;

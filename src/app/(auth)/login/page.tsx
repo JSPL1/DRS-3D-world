@@ -18,7 +18,7 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string; reset?: string; error?: string }>;
 }) {
   const params = await searchParams;
-  const settings = getSettings();
+  const settings = await getSettings();
 
   return (
     <LoginForm

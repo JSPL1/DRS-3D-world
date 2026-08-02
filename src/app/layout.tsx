@@ -26,7 +26,7 @@ const jakarta = Plus_Jakarta_Sans({
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const branding = getBranding();
+  const branding = await getBranding();
 
   return {
     metadataBase: new URL(site.url),
@@ -77,7 +77,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export async function generateViewport(): Promise<Viewport> {
-  const branding = getBranding();
+  const branding = await getBranding();
 
   return {
     themeColor: branding.theme === 'light' ? '#f7f6f3' : '#0b0b0c',
@@ -87,8 +87,8 @@ export async function generateViewport(): Promise<Viewport> {
   };
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const branding = getBranding();
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const branding = await getBranding();
 
   return (
     <html

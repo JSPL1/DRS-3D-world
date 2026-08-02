@@ -29,13 +29,13 @@ export async function POST(req: Request) {
   }
   const b = parsed.data;
 
-  const result = run(
+  const result = await run(
     `INSERT INTO banners (title, subtitle, image_url, cta_label, cta_href, placement, is_active, sort_order)
      VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM banners WHERE placement = ?))`,
     [b.title, b.subtitle || null, b.imageUrl || null, b.ctaLabel || null, b.ctaHref || null, b.placement, b.isActive ? 1 : 0, b.placement],
   );
 
-  logActivity(user.id, user.name, 'created banner', 'banner', Number(result.lastInsertRowid), b.title);
+  await logActivity(user.id, user.name, 'created banner', 'banner', Number(result.lastInsertRowid), b.title);
   revalidatePath('/');
   revalidatePath('/admin/banners');
 
@@ -55,7 +55,7 @@ export async function PATCH(req: Request) {
   }
   const b = parsed.data;
 
-  const result = run(
+  const result = await run(
     `UPDATE banners SET title = ?, subtitle = ?, image_url = ?, cta_label = ?, cta_href = ?, placement = ?, is_active = ?
      WHERE id = ?`,
     [b.title, b.subtitle || null, b.imageUrl || null, b.ctaLabel || null, b.ctaHref || null, b.placement, b.isActive ? 1 : 0, b.id],
@@ -65,7 +65,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Banner not found.' }, { status: 404 });
   }
 
-  logActivity(user.id, user.name, 'updated banner', 'banner', b.id, b.title);
+  await logActivity(user.id, user.name, 'updated banner', 'banner', b.id, b.title);
   revalidatePath('/');
   revalidatePath('/admin/banners');
 
@@ -81,11 +81,11 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Invalid id.' }, { status: 400 });
   }
 
-  const existing = one<{ title: string }>(`SELECT title FROM banners WHERE id = ?`, [id]);
+  const existing = await one<{ title: string }>(`SELECT title FROM banners WHERE id = ?`, [id]);
   if (!existing) return NextResponse.json({ error: 'Banner not found.' }, { status: 404 });
 
-  run(`DELETE FROM banners WHERE id = ?`, [id]);
-  logActivity(user.id, user.name, 'deleted banner', 'banner', id, existing.title);
+  await run(`DELETE FROM banners WHERE id = ?`, [id]);
+  await logActivity(user.id, user.name, 'deleted banner', 'banner', id, existing.title);
   revalidatePath('/');
   revalidatePath('/admin/banners');
 

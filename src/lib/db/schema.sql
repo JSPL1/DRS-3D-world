@@ -1,127 +1,128 @@
 -- ============================================================
--- DRS 3D WORLD — SQLite schema
--- Idempotent: safe to run on every boot.
+-- DRS 3D WORLD — MySQL schema
+-- Idempotent: safe to run on every boot (CREATE TABLE IF NOT EXISTS).
 -- ============================================================
-
-PRAGMA foreign_keys = ON;
 
 -- ---------- Identity & access ------------------------------
 
 CREATE TABLE IF NOT EXISTS users (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  name          TEXT    NOT NULL,
-  email         TEXT    NOT NULL UNIQUE,
-  phone         TEXT,
+  id            INT AUTO_INCREMENT PRIMARY KEY,
+  name          VARCHAR(255) NOT NULL,
+  email         VARCHAR(255) NOT NULL UNIQUE,
+  phone         VARCHAR(32),
   password_hash TEXT    NOT NULL,
-  role          TEXT    NOT NULL DEFAULT 'customer'
+  role          VARCHAR(16) NOT NULL DEFAULT 'customer'
                 CHECK (role IN ('admin','manager','sales','customer','viewer')),
-  status        TEXT    NOT NULL DEFAULT 'active'
+  status        VARCHAR(16) NOT NULL DEFAULT 'active'
                 CHECK (status IN ('active','suspended','pending')),
   avatar_url    TEXT,
   -- Bumped on password change / forced logout: invalidates every issued JWT.
-  token_version INTEGER NOT NULL DEFAULT 0,
-  last_login_at TEXT,
-  created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
-  updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+  token_version INT NOT NULL DEFAULT 0,
+  last_login_at DATETIME,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX idx_users_role ON users(role);
 -- The unique index on users(phone) is created in db/index.ts, not here: this
 -- file runs on every boot including against existing databases, and a
 -- duplicate number left over from before sign-in-by-mobile would abort the
 -- whole migration and take the site down with it.
 
 CREATE TABLE IF NOT EXISTS otp_codes (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  user_id     INT NOT NULL,
   code_hash   TEXT    NOT NULL,
-  purpose     TEXT    NOT NULL DEFAULT 'password_reset'
+  purpose     VARCHAR(32) NOT NULL DEFAULT 'password_reset'
               CHECK (purpose IN ('password_reset','email_verify','login_2fa')),
-  attempts    INTEGER NOT NULL DEFAULT 0,
-  expires_at  TEXT    NOT NULL,
-  consumed_at TEXT,
-  created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_otp_user ON otp_codes(user_id, purpose);
+  attempts    INT NOT NULL DEFAULT 0,
+  expires_at  DATETIME NOT NULL,
+  consumed_at DATETIME,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX idx_otp_user ON otp_codes(user_id, purpose);
 
 -- Short-lived ticket proving "this user just passed OTP", so the reset
 -- screen can't be reached by guessing a URL.
 CREATE TABLE IF NOT EXISTS reset_tickets (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token_hash TEXT    NOT NULL UNIQUE,
-  expires_at TEXT    NOT NULL,
-  used_at    TEXT,
-  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  user_id    INT NOT NULL,
+  token_hash VARCHAR(255) NOT NULL UNIQUE,
+  expires_at DATETIME NOT NULL,
+  used_at    DATETIME,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------- Catalogue --------------------------------------
 
 CREATE TABLE IF NOT EXISTS categories (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  name        TEXT    NOT NULL,
-  slug        TEXT    NOT NULL UNIQUE,
-  parent_id   INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  name        VARCHAR(255) NOT NULL,
+  slug        VARCHAR(255) NOT NULL UNIQUE,
+  parent_id   INT,
   description TEXT,
   image_url   TEXT,
-  icon        TEXT,
-  sort_order  INTEGER NOT NULL DEFAULT 0,
-  is_active   INTEGER NOT NULL DEFAULT 1,
-  seo_title   TEXT,
+  icon        VARCHAR(64),
+  sort_order  INT NOT NULL DEFAULT 0,
+  is_active   TINYINT(1) NOT NULL DEFAULT 1,
+  seo_title   VARCHAR(255),
   seo_description TEXT,
-  created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS brands (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  name       TEXT    NOT NULL,
-  slug       TEXT    NOT NULL UNIQUE,
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  name       VARCHAR(255) NOT NULL,
+  slug       VARCHAR(255) NOT NULL UNIQUE,
   logo_url   TEXT,
   website    TEXT,
   description TEXT,
-  is_active  INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+  is_active  TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS products (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  name            TEXT    NOT NULL,
-  slug            TEXT    NOT NULL UNIQUE,
-  sku             TEXT    NOT NULL UNIQUE,
-  category_id     INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-  brand_id        INTEGER REFERENCES brands(id) ON DELETE SET NULL,
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  name            VARCHAR(255) NOT NULL,
+  slug            VARCHAR(255) NOT NULL UNIQUE,
+  sku             VARCHAR(64) NOT NULL UNIQUE,
+  category_id     INT,
+  brand_id        INT,
   short_description TEXT,
   description     TEXT,
   features        TEXT,           -- JSON array of strings
   specifications  TEXT,           -- JSON array of {label,value}
 
-  price           REAL    NOT NULL DEFAULT 0,
-  discount_price  REAL,
-  currency        TEXT    NOT NULL DEFAULT 'INR',
-  stock           INTEGER NOT NULL DEFAULT 0,
-  availability    TEXT    NOT NULL DEFAULT 'in_stock'
+  price           DOUBLE NOT NULL DEFAULT 0,
+  discount_price  DOUBLE,
+  currency        VARCHAR(8) NOT NULL DEFAULT 'INR',
+  stock           INT NOT NULL DEFAULT 0,
+  availability    VARCHAR(16) NOT NULL DEFAULT 'in_stock'
                   CHECK (availability IN ('in_stock','made_to_order','out_of_stock','preorder')),
 
   -- Manufacturing attributes
-  length_mm       REAL,
-  width_mm        REAL,
-  height_mm       REAL,
-  weight_g        REAL,
-  material        TEXT,
-  print_technology TEXT,          -- FDM / SLA / SLS / MJF ...
-  print_time_hours REAL,
-  layer_height_mm REAL,
-  infill_percent  INTEGER,
-  color           TEXT,
+  length_mm       DOUBLE,
+  width_mm        DOUBLE,
+  height_mm       DOUBLE,
+  weight_g        DOUBLE,
+  material        VARCHAR(255),
+  print_technology VARCHAR(32),   -- FDM / SLA / SLS / MJF ...
+  print_time_hours DOUBLE,
+  layer_height_mm DOUBLE,
+  infill_percent  INT,
+  color           VARCHAR(64),
 
   -- Merchandising flags
-  is_featured     INTEGER NOT NULL DEFAULT 0,
-  is_trending     INTEGER NOT NULL DEFAULT 0,
-  is_popular      INTEGER NOT NULL DEFAULT 0,
-  is_new_arrival  INTEGER NOT NULL DEFAULT 0,
-  is_best_seller  INTEGER NOT NULL DEFAULT 0,
-  visibility      TEXT    NOT NULL DEFAULT 'public'
+  is_featured     TINYINT(1) NOT NULL DEFAULT 0,
+  is_trending     TINYINT(1) NOT NULL DEFAULT 0,
+  is_popular      TINYINT(1) NOT NULL DEFAULT 0,
+  is_new_arrival  TINYINT(1) NOT NULL DEFAULT 0,
+  is_best_seller  TINYINT(1) NOT NULL DEFAULT 0,
+  visibility      VARCHAR(16) NOT NULL DEFAULT 'public'
                   CHECK (visibility IN ('public','private','hidden')),
-  status          TEXT    NOT NULL DEFAULT 'published'
+  status          VARCHAR(16) NOT NULL DEFAULT 'published'
                   CHECK (status IN ('draft','published','archived')),
 
   -- Media & downloads
@@ -134,378 +135,424 @@ CREATE TABLE IF NOT EXISTS products (
   qr_code_url     TEXT,
 
   -- SEO
-  seo_title       TEXT,
+  seo_title       VARCHAR(255),
   seo_description TEXT,
   meta_keywords   TEXT,
 
-  rating_avg      REAL    NOT NULL DEFAULT 0,
-  rating_count    INTEGER NOT NULL DEFAULT 0,
-  view_count      INTEGER NOT NULL DEFAULT 0,
-  sort_order      INTEGER NOT NULL DEFAULT 0,
-  created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
-  updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
-CREATE INDEX IF NOT EXISTS idx_products_status ON products(status, visibility);
-CREATE INDEX IF NOT EXISTS idx_products_flags ON products(is_featured, is_trending, is_best_seller);
+  rating_avg      DOUBLE NOT NULL DEFAULT 0,
+  rating_count    INT NOT NULL DEFAULT 0,
+  view_count      INT NOT NULL DEFAULT 0,
+  sort_order      INT NOT NULL DEFAULT 0,
+
+  -- Who entered a product, and whether an administrator has signed it off.
+  -- The name is denormalised on purpose: it has to survive the staff member
+  -- leaving and their account being removed.
+  created_by        INT,
+  created_by_name   VARCHAR(255),
+  updated_by_name   VARCHAR(255),
+  approval_status   VARCHAR(16) NOT NULL DEFAULT 'approved',
+  approved_by_name  VARCHAR(255),
+  approved_at       DATETIME,
+  review_note       TEXT,
+
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
+  FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX idx_products_category ON products(category_id);
+CREATE INDEX idx_products_status ON products(status, visibility);
+CREATE INDEX idx_products_flags ON products(is_featured, is_trending, is_best_seller);
 
 CREATE TABLE IF NOT EXISTS product_images (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  product_id INT NOT NULL,
   url        TEXT    NOT NULL,
   alt        TEXT,
-  kind       TEXT    NOT NULL DEFAULT 'gallery'
+  kind       VARCHAR(16) NOT NULL DEFAULT 'gallery'
              CHECK (kind IN ('gallery','360','before','after','thumbnail')),
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  width      INTEGER,
-  height     INTEGER
-);
-CREATE INDEX IF NOT EXISTS idx_product_images ON product_images(product_id, kind, sort_order);
+  sort_order INT NOT NULL DEFAULT 0,
+  width      INT,
+  height     INT,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX idx_product_images ON product_images(product_id, kind, sort_order);
 
 -- ---------- Colour variants ---------------------------------
 -- The studio's standard filament/resin palette. Admin curates this list; each
 -- product then opts into the subset it can actually be printed in.
 CREATE TABLE IF NOT EXISTS colors (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  name       TEXT    NOT NULL UNIQUE,
-  hex        TEXT    NOT NULL,
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  is_active  INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  name       VARCHAR(255) NOT NULL UNIQUE,
+  hex        VARCHAR(16) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active  TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS product_colors (
-  product_id  INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  color_id    INTEGER NOT NULL REFERENCES colors(id) ON DELETE CASCADE,
+  product_id  INT NOT NULL,
+  color_id    INT NOT NULL,
   -- Optional photograph of this product in this colour; falls back to the
   -- product's main gallery image when absent.
   image_url   TEXT,
-  price_delta REAL    NOT NULL DEFAULT 0,
-  is_default  INTEGER NOT NULL DEFAULT 0,
-  sort_order  INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY (product_id, color_id)
-);
-CREATE INDEX IF NOT EXISTS idx_product_colors ON product_colors(product_id, sort_order);
+  price_delta DOUBLE NOT NULL DEFAULT 0,
+  is_default  TINYINT(1) NOT NULL DEFAULT 0,
+  sort_order  INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (product_id, color_id),
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  FOREIGN KEY (color_id) REFERENCES colors(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX idx_product_colors ON product_colors(product_id, sort_order);
 
 CREATE TABLE IF NOT EXISTS product_relations (
-  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  related_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  PRIMARY KEY (product_id, related_id)
-);
+  product_id INT NOT NULL,
+  related_id INT NOT NULL,
+  PRIMARY KEY (product_id, related_id),
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  FOREIGN KEY (related_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS product_tags (
-  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  tag        TEXT    NOT NULL,
-  PRIMARY KEY (product_id, tag)
-);
+  product_id INT NOT NULL,
+  tag        VARCHAR(255) NOT NULL,
+  PRIMARY KEY (product_id, tag),
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------- Commerce ---------------------------------------
 
 CREATE TABLE IF NOT EXISTS orders (
-  id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  order_number   TEXT    NOT NULL UNIQUE,
-  user_id        INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  customer_name  TEXT    NOT NULL,
-  customer_email TEXT    NOT NULL,
-  customer_phone TEXT,
+  id             INT AUTO_INCREMENT PRIMARY KEY,
+  order_number   VARCHAR(64) NOT NULL UNIQUE,
+  user_id        INT,
+  customer_name  VARCHAR(255) NOT NULL,
+  customer_email VARCHAR(255) NOT NULL,
+  customer_phone VARCHAR(32),
   shipping_address TEXT,
-  subtotal       REAL    NOT NULL DEFAULT 0,
-  discount       REAL    NOT NULL DEFAULT 0,
-  tax            REAL    NOT NULL DEFAULT 0,
-  shipping       REAL    NOT NULL DEFAULT 0,
-  total          REAL    NOT NULL DEFAULT 0,
-  coupon_code    TEXT,
-  status         TEXT    NOT NULL DEFAULT 'pending'
+  subtotal       DOUBLE NOT NULL DEFAULT 0,
+  discount       DOUBLE NOT NULL DEFAULT 0,
+  tax            DOUBLE NOT NULL DEFAULT 0,
+  shipping       DOUBLE NOT NULL DEFAULT 0,
+  total          DOUBLE NOT NULL DEFAULT 0,
+  coupon_code    VARCHAR(64),
+  status         VARCHAR(20) NOT NULL DEFAULT 'pending'
                  CHECK (status IN ('pending','confirmed','printing','post_processing','shipped','completed','cancelled','refunded')),
-  payment_status TEXT    NOT NULL DEFAULT 'unpaid'
+  payment_status VARCHAR(16) NOT NULL DEFAULT 'unpaid'
                  CHECK (payment_status IN ('unpaid','partial','paid','refunded')),
-  payment_method TEXT,
+  payment_method VARCHAR(32),
   notes          TEXT,
-  created_at     TEXT    NOT NULL DEFAULT (datetime('now')),
-  updated_at     TEXT    NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status, created_at);
+
+  placed_via     VARCHAR(32) NOT NULL DEFAULT 'website',
+  gift_wrap        TINYINT(1) NOT NULL DEFAULT 0,
+  gift_wrap_fee    DOUBLE NOT NULL DEFAULT 0,
+  gift_note        TEXT,
+  delivery_lat     DOUBLE,
+  delivery_lng     DOUBLE,
+  delivery_landmark TEXT,
+  shipping_method  VARCHAR(32) NOT NULL DEFAULT 'standard',
+
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX idx_orders_status ON orders(status, created_at);
 
 CREATE TABLE IF NOT EXISTS order_items (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  order_id     INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  product_id   INTEGER REFERENCES products(id) ON DELETE SET NULL,
-  product_name TEXT    NOT NULL,
-  sku          TEXT,
-  quantity     INTEGER NOT NULL DEFAULT 1,
-  unit_price   REAL    NOT NULL DEFAULT 0,
-  total        REAL    NOT NULL DEFAULT 0
-);
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  order_id     INT NOT NULL,
+  product_id   INT,
+  product_name VARCHAR(255) NOT NULL,
+  sku          VARCHAR(64),
+  quantity     INT NOT NULL DEFAULT 1,
+  unit_price   DOUBLE NOT NULL DEFAULT 0,
+  total        DOUBLE NOT NULL DEFAULT 0,
+  color_name   VARCHAR(255),
+  color_hex    VARCHAR(16),
+  FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS coupons (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  code          TEXT    NOT NULL UNIQUE,
+  id            INT AUTO_INCREMENT PRIMARY KEY,
+  code          VARCHAR(64) NOT NULL UNIQUE,
   description   TEXT,
-  type          TEXT    NOT NULL DEFAULT 'percent' CHECK (type IN ('percent','fixed')),
-  value         REAL    NOT NULL DEFAULT 0,
-  min_order     REAL    NOT NULL DEFAULT 0,
-  max_discount  REAL,
-  usage_limit   INTEGER,
-  used_count    INTEGER NOT NULL DEFAULT 0,
-  starts_at     TEXT,
-  expires_at    TEXT,
-  is_active     INTEGER NOT NULL DEFAULT 1,
-  created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+  type          VARCHAR(16) NOT NULL DEFAULT 'percent' CHECK (type IN ('percent','fixed')),
+  value         DOUBLE NOT NULL DEFAULT 0,
+  min_order     DOUBLE NOT NULL DEFAULT 0,
+  max_discount  DOUBLE,
+  usage_limit   INT,
+  used_count    INT NOT NULL DEFAULT 0,
+  starts_at     DATETIME,
+  expires_at    DATETIME,
+  is_active     TINYINT(1) NOT NULL DEFAULT 1,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------- Content ----------------------------------------
 
 CREATE TABLE IF NOT EXISTS banners (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  title       TEXT    NOT NULL,
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  title       VARCHAR(255) NOT NULL,
   subtitle    TEXT,
   image_url   TEXT,
   video_url   TEXT,
-  cta_label   TEXT,
+  cta_label   VARCHAR(255),
   cta_href    TEXT,
-  placement   TEXT    NOT NULL DEFAULT 'home_hero',
-  sort_order  INTEGER NOT NULL DEFAULT 0,
-  is_active   INTEGER NOT NULL DEFAULT 1,
-  starts_at   TEXT,
-  ends_at     TEXT,
-  created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+  placement   VARCHAR(32) NOT NULL DEFAULT 'home_hero',
+  sort_order  INT NOT NULL DEFAULT 0,
+  is_active   TINYINT(1) NOT NULL DEFAULT 1,
+  starts_at   DATETIME,
+  ends_at     DATETIME,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS blogs (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  title           TEXT    NOT NULL,
-  slug            TEXT    NOT NULL UNIQUE,
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  title           VARCHAR(255) NOT NULL,
+  slug            VARCHAR(255) NOT NULL UNIQUE,
   excerpt         TEXT,
-  content         TEXT,
+  content         LONGTEXT,
   cover_url       TEXT,
-  author_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  category        TEXT,
+  author_id       INT,
+  category        VARCHAR(255),
   tags            TEXT,       -- JSON array
-  reading_minutes INTEGER NOT NULL DEFAULT 3,
-  status          TEXT    NOT NULL DEFAULT 'published'
+  reading_minutes INT NOT NULL DEFAULT 3,
+  status          VARCHAR(16) NOT NULL DEFAULT 'published'
                   CHECK (status IN ('draft','published','archived')),
-  view_count      INTEGER NOT NULL DEFAULT 0,
-  seo_title       TEXT,
+  view_count      INT NOT NULL DEFAULT 0,
+  seo_title       VARCHAR(255),
   seo_description TEXT,
-  published_at    TEXT,
-  created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
-  updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+  published_at    DATETIME,
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS blog_comments (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  blog_id    INTEGER NOT NULL REFERENCES blogs(id) ON DELETE CASCADE,
-  author_name TEXT   NOT NULL,
-  author_email TEXT,
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  blog_id    INT NOT NULL,
+  author_name VARCHAR(255) NOT NULL,
+  author_email VARCHAR(255),
   body       TEXT    NOT NULL,
-  is_approved INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+  is_approved TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (blog_id) REFERENCES blogs(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS gallery_items (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  title       TEXT,
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  title       VARCHAR(255),
   caption     TEXT,
   url         TEXT    NOT NULL,
   thumb_url   TEXT,
-  media_type  TEXT    NOT NULL DEFAULT 'image'
+  media_type  VARCHAR(20) NOT NULL DEFAULT 'image'
               CHECK (media_type IN ('image','video','360','before_after','customer_photo')),
   before_url  TEXT,
   after_url   TEXT,
-  category    TEXT,
+  category    VARCHAR(255),
   tags        TEXT,
-  width       INTEGER,
-  height      INTEGER,
-  sort_order  INTEGER NOT NULL DEFAULT 0,
-  is_active   INTEGER NOT NULL DEFAULT 1,
-  created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+  width       INT,
+  height      INT,
+  sort_order  INT NOT NULL DEFAULT 0,
+  is_active   TINYINT(1) NOT NULL DEFAULT 1,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS videos (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  title        TEXT    NOT NULL,
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  title        VARCHAR(255) NOT NULL,
   description  TEXT,
   youtube_url  TEXT,
   file_url     TEXT,
   thumb_url    TEXT,
-  duration_sec INTEGER,
-  category     TEXT,
-  sort_order   INTEGER NOT NULL DEFAULT 0,
-  is_active    INTEGER NOT NULL DEFAULT 1,
-  created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+  duration_sec INT,
+  category     VARCHAR(255),
+  sort_order   INT NOT NULL DEFAULT 0,
+  is_active    TINYINT(1) NOT NULL DEFAULT 1,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS testimonials (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  author_name  TEXT    NOT NULL,
-  author_role  TEXT,
-  company      TEXT,
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  author_name  VARCHAR(255) NOT NULL,
+  author_role  VARCHAR(255),
+  company      VARCHAR(255),
   avatar_url   TEXT,
   quote        TEXT    NOT NULL,
-  rating       INTEGER NOT NULL DEFAULT 5,
-  is_featured  INTEGER NOT NULL DEFAULT 0,
-  is_active    INTEGER NOT NULL DEFAULT 1,
-  sort_order   INTEGER NOT NULL DEFAULT 0,
-  created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+  rating       INT NOT NULL DEFAULT 5,
+  is_featured  TINYINT(1) NOT NULL DEFAULT 0,
+  is_active    TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order   INT NOT NULL DEFAULT 0,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS reviews (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  product_id  INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  author_name TEXT    NOT NULL,
-  rating      INTEGER NOT NULL DEFAULT 5 CHECK (rating BETWEEN 1 AND 5),
-  title       TEXT,
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  product_id  INT NOT NULL,
+  user_id     INT,
+  author_name VARCHAR(255) NOT NULL,
+  rating      INT NOT NULL DEFAULT 5 CHECK (rating BETWEEN 1 AND 5),
+  title       VARCHAR(255),
   body        TEXT,
-  is_approved INTEGER NOT NULL DEFAULT 0,
-  created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+  is_approved TINYINT(1) NOT NULL DEFAULT 0,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS faqs (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  id         INT AUTO_INCREMENT PRIMARY KEY,
   question   TEXT    NOT NULL,
   answer     TEXT    NOT NULL,
-  category   TEXT,
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  is_active  INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+  category   VARCHAR(255),
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active  TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------- Leads, enquiries & quotes ----------------------
 
 CREATE TABLE IF NOT EXISTS leads (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  name       TEXT    NOT NULL,
-  email      TEXT,
-  phone      TEXT,
-  company    TEXT,
-  subject    TEXT,
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  name       VARCHAR(255) NOT NULL,
+  email      VARCHAR(255),
+  phone      VARCHAR(32),
+  company    VARCHAR(255),
+  subject    VARCHAR(255),
   message    TEXT,
-  source     TEXT    NOT NULL DEFAULT 'contact_form',
+  source     VARCHAR(32) NOT NULL DEFAULT 'contact_form',
   file_url   TEXT,
-  status     TEXT    NOT NULL DEFAULT 'new'
+  status     VARCHAR(16) NOT NULL DEFAULT 'new'
              CHECK (status IN ('new','contacted','qualified','won','lost')),
-  assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  assigned_to INT,
   notes      TEXT,
-  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status, created_at);
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX idx_leads_status ON leads(status, created_at);
 
 CREATE TABLE IF NOT EXISTS quotes (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  reference       TEXT    NOT NULL UNIQUE,
-  user_id         INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  customer_name   TEXT,
-  customer_email  TEXT,
-  customer_phone  TEXT,
-  file_name       TEXT,
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  reference       VARCHAR(64) NOT NULL UNIQUE,
+  user_id         INT,
+  customer_name   VARCHAR(255),
+  customer_email  VARCHAR(255),
+  customer_phone  VARCHAR(32),
+  file_name       VARCHAR(255),
   file_url        TEXT,
   -- Geometry derived from the uploaded mesh
-  volume_cm3      REAL,
-  bbox_x_mm       REAL,
-  bbox_y_mm       REAL,
-  bbox_z_mm       REAL,
-  triangle_count  INTEGER,
-  surface_area_cm2 REAL,
+  volume_cm3      DOUBLE,
+  bbox_x_mm       DOUBLE,
+  bbox_y_mm       DOUBLE,
+  bbox_z_mm       DOUBLE,
+  triangle_count  INT,
+  surface_area_cm2 DOUBLE,
   -- Chosen print parameters
-  material        TEXT,
-  technology      TEXT,
-  layer_height_mm REAL,
-  infill_percent  INTEGER,
-  quantity        INTEGER NOT NULL DEFAULT 1,
-  needs_support   INTEGER NOT NULL DEFAULT 0,
+  material        VARCHAR(255),
+  technology      VARCHAR(32),
+  layer_height_mm DOUBLE,
+  infill_percent  INT,
+  quantity        INT NOT NULL DEFAULT 1,
+  needs_support   TINYINT(1) NOT NULL DEFAULT 0,
   -- Cost breakdown
-  weight_g        REAL,
-  print_hours     REAL,
-  material_cost   REAL,
-  machine_cost    REAL,
-  labour_cost     REAL,
-  electricity_cost REAL,
-  support_cost    REAL,
-  profit          REAL,
-  gst             REAL,
-  delivery        REAL,
-  total           REAL,
-  status          TEXT    NOT NULL DEFAULT 'new'
+  weight_g        DOUBLE,
+  print_hours     DOUBLE,
+  material_cost   DOUBLE,
+  machine_cost    DOUBLE,
+  labour_cost     DOUBLE,
+  electricity_cost DOUBLE,
+  support_cost    DOUBLE,
+  profit          DOUBLE,
+  gst             DOUBLE,
+  delivery        DOUBLE,
+  total           DOUBLE,
+  status          VARCHAR(16) NOT NULL DEFAULT 'new'
                   CHECK (status IN ('new','reviewed','sent','accepted','rejected')),
-  created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------- System -----------------------------------------
 
 CREATE TABLE IF NOT EXISTS settings (
-  key        TEXT PRIMARY KEY,
+  `key`      VARCHAR(255) PRIMARY KEY,
   value      TEXT,
-  "group"    TEXT NOT NULL DEFAULT 'general',
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+  `group`    VARCHAR(64) NOT NULL DEFAULT 'general',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS homepage_sections (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  key        TEXT    NOT NULL UNIQUE,
-  title      TEXT    NOT NULL,
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  `key`      VARCHAR(255) NOT NULL UNIQUE,
+  title      VARCHAR(255) NOT NULL,
   subtitle   TEXT,
   config     TEXT,       -- JSON blob for the section's own settings
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  is_enabled INTEGER NOT NULL DEFAULT 1
-);
+  sort_order INT NOT NULL DEFAULT 0,
+  is_enabled TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS notifications (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  title      TEXT    NOT NULL,
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  user_id    INT,
+  title      VARCHAR(255) NOT NULL,
   body       TEXT,
-  type       TEXT    NOT NULL DEFAULT 'info'
+  type       VARCHAR(16) NOT NULL DEFAULT 'info'
              CHECK (type IN ('info','success','warning','error','order','lead','quote')),
   href       TEXT,
-  is_read    INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+  is_read    TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS activity_logs (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  actor_name  TEXT,
-  action      TEXT    NOT NULL,
-  entity_type TEXT,
-  entity_id   INTEGER,
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  user_id     INT,
+  actor_name  VARCHAR(255),
+  action      VARCHAR(255) NOT NULL,
+  entity_type VARCHAR(64),
+  entity_id   INT,
   detail      TEXT,
-  ip_address  TEXT,
-  created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_logs(created_at DESC);
+  ip_address  VARCHAR(64),
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX idx_activity_created ON activity_logs(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS page_views (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  path       TEXT    NOT NULL,
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  path       VARCHAR(512) NOT NULL,
   referrer   TEXT,
-  country    TEXT,
-  device     TEXT,
-  session_id TEXT,
-  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_page_views_created ON page_views(created_at);
+  country    VARCHAR(64),
+  device     VARCHAR(32),
+  session_id VARCHAR(64),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX idx_page_views_created ON page_views(created_at);
 
 CREATE TABLE IF NOT EXISTS media (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  file_name   TEXT    NOT NULL,
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  file_name   VARCHAR(255) NOT NULL,
   url         TEXT    NOT NULL,
-  mime_type   TEXT,
-  size_bytes  INTEGER,
-  width       INTEGER,
-  height      INTEGER,
-  folder      TEXT    NOT NULL DEFAULT 'general',
-  uploaded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+  mime_type   VARCHAR(128),
+  size_bytes  INT,
+  width       INT,
+  height      INT,
+  folder      VARCHAR(64) NOT NULL DEFAULT 'general',
+  uploaded_by INT,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------- Redesign additions ------------------------------
 -- The heart icon on a product card. One row per (customer, product); the
 -- unique index is what makes "toggle" idempotent from the API.
 CREATE TABLE IF NOT EXISTS wishlists (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
-);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_wishlists_user_product ON wishlists(user_id, product_id);
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  user_id    INT NOT NULL,
+  product_id INT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE UNIQUE INDEX idx_wishlists_user_product ON wishlists(user_id, product_id);

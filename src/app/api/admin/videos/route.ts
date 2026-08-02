@@ -29,13 +29,13 @@ export async function POST(req: Request) {
   }
   const v = parsed.data;
 
-  const result = run(
+  const result = await run(
     `INSERT INTO videos (title, description, youtube_url, thumb_url, duration_sec, category, is_active, sort_order)
      VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM videos))`,
     [v.title, v.description || null, v.youtubeUrl || null, v.thumbUrl || null, v.durationSec || null, v.category || null, v.isActive ? 1 : 0],
   );
 
-  logActivity(user.id, user.name, 'added video', 'video', Number(result.lastInsertRowid), v.title);
+  await logActivity(user.id, user.name, 'added video', 'video', Number(result.lastInsertRowid), v.title);
   revalidatePath('/videos');
   revalidatePath('/admin/videos');
 
@@ -55,7 +55,7 @@ export async function PATCH(req: Request) {
   }
   const v = parsed.data;
 
-  const result = run(
+  const result = await run(
     `UPDATE videos SET title = ?, description = ?, youtube_url = ?, thumb_url = ?, duration_sec = ?, category = ?, is_active = ?
      WHERE id = ?`,
     [v.title, v.description || null, v.youtubeUrl || null, v.thumbUrl || null, v.durationSec || null, v.category || null, v.isActive ? 1 : 0, v.id],
@@ -65,7 +65,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Video not found.' }, { status: 404 });
   }
 
-  logActivity(user.id, user.name, 'updated video', 'video', v.id, v.title);
+  await logActivity(user.id, user.name, 'updated video', 'video', v.id, v.title);
   revalidatePath('/videos');
   revalidatePath('/admin/videos');
 
@@ -81,11 +81,11 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Invalid id.' }, { status: 400 });
   }
 
-  const existing = one<{ title: string }>(`SELECT title FROM videos WHERE id = ?`, [id]);
+  const existing = await one<{ title: string }>(`SELECT title FROM videos WHERE id = ?`, [id]);
   if (!existing) return NextResponse.json({ error: 'Video not found.' }, { status: 404 });
 
-  run(`DELETE FROM videos WHERE id = ?`, [id]);
-  logActivity(user.id, user.name, 'deleted video', 'video', id, existing.title);
+  await run(`DELETE FROM videos WHERE id = ?`, [id]);
+  await logActivity(user.id, user.name, 'deleted video', 'video', id, existing.title);
   revalidatePath('/videos');
   revalidatePath('/admin/videos');
 

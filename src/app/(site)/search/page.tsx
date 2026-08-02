@@ -23,11 +23,11 @@ export default async function SearchPage({
   const query = typeof q === 'string' ? q.trim() : '';
 
   const { items, total } = query
-    ? getProducts({ search: query, limit: 24 })
+    ? await getProducts({ search: query, limit: 24 })
     : { items: [], total: 0 };
 
-  const materials = getMaterials().slice(0, 8);
-  const technologies = getTechnologies();
+  const materials = (await getMaterials()).slice(0, 8);
+  const technologies = await getTechnologies();
 
   return (
     <div className="pb-24 pt-36">

@@ -8,7 +8,7 @@ export const metadata = { title: 'FAQ' };
 export default async function AdminFaqPage() {
   await requirePermission('faq.edit');
 
-  const faqs = all<{
+  const faqs = await all<{
     id: number;
     question: string;
     answer: string;

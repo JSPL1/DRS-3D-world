@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { guard } from '@/lib/auth/api-guard';
 import { logActivity } from '@/lib/auth/session';
-import { getDb } from '@/lib/db';
+import { getPool } from '@/lib/db';
 
 export const runtime = 'nodejs';
 
@@ -26,18 +26,26 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Nothing to save.' }, { status: 400 });
   }
 
-  const db = getDb();
-  const upsert = db.prepare(
-    `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`,
-  );
-
   // One transaction so a partial save can't leave pricing half-updated.
-  db.transaction(() => {
-    for (const [key, value] of entries) upsert.run(key, value);
-  })();
+  const conn = await getPool().getConnection();
+  try {
+    await conn.beginTransaction();
+    for (const [key, value] of entries) {
+      await conn.query(
+        `INSERT INTO settings (\`key\`, value, updated_at) VALUES (?, ?, NOW())
+         ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()`,
+        [key, value],
+      );
+    }
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 
-  logActivity(user.id, user.name, 'updated settings', 'settings', undefined, `${entries.length} keys`);
+  await logActivity(user.id, user.name, 'updated settings', 'settings', undefined, `${entries.length} keys`);
 
   // 'layout' scope: the theme and logo live in the root layout, so the whole
   // shell has to be rebuilt, not just the page body.

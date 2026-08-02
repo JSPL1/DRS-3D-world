@@ -175,7 +175,7 @@ export async function PATCH(req: Request) {
   }
 
   // `table` and `column` come only from the whitelist above, never the request.
-  const result = run(
+  const result = await run(
     `UPDATE ${entity.table} SET ${entity.column} = ? WHERE id = ?`,
     [value, parsed.data.id],
   );
@@ -184,7 +184,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Nothing was updated — does that record exist?' }, { status: 404 });
   }
 
-  logActivity(
+  await logActivity(
     user.id,
     user.name,
     `updated ${entity.label}`,

@@ -43,7 +43,7 @@ export async function POST(req: Request) {
   // Registration cannot complete without the emailed code, so a site with no
   // mail configured must say so rather than create an account that can never
   // be verified and report "check your inbox".
-  if (!isMailConfigured()) {
+  if (!(await isMailConfigured())) {
     return NextResponse.json(
       {
         error: `Email is not set up on this site yet, so we cannot send you a code. Please contact the studio on ${site.contact.phone}.`,
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
   }
   const phone = normalisePhone(parsed.data.phone)!;
 
-  const existing = one<{ id: number; email: string; name: string; status: string }>(
+  const existing = await one<{ id: number; email: string; name: string; status: string }>(
     `SELECT id, email, name, status FROM users WHERE email = ? OR phone = ?`,
     [email, phone],
   );
@@ -95,13 +95,12 @@ export async function POST(req: Request) {
     );
   }
 
-  const id = Number(
-    run(
-      `INSERT INTO users (name, email, phone, password_hash, role, status)
-       VALUES (?, ?, ?, ?, 'customer', 'pending')`,
-      [name, email, phone, bcrypt.hashSync(password, 10)],
-    ).lastInsertRowid,
+  const { lastInsertRowid } = await run(
+    `INSERT INTO users (name, email, phone, password_hash, role, status)
+     VALUES (?, ?, ?, ?, 'customer', 'pending')`,
+    [name, email, phone, bcrypt.hashSync(password, 10)],
   );
+  const id = Number(lastInsertRowid);
 
   const code = await issueOtp({ id, email, name }, 'email_verify');
 

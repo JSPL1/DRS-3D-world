@@ -20,13 +20,13 @@ export const dynamic = 'force-dynamic';
  * through the server only when the fingerprint moves.
  */
 const WATCHERS: Record<string, string> = {
-  products: `SELECT COUNT(*) || ':' || COALESCE(MAX(updated_at), '') || ':' ||
-                    COALESCE(SUM(CASE WHEN approval_status = 'pending' THEN 1 ELSE 0 END), 0) AS rev
+  products: `SELECT CONCAT(COUNT(*), ':', COALESCE(MAX(updated_at), ''), ':',
+                    COALESCE(SUM(CASE WHEN approval_status = 'pending' THEN 1 ELSE 0 END), 0)) AS rev
              FROM products`,
-  orders: `SELECT COUNT(*) || ':' || COALESCE(MAX(created_at), '') AS rev FROM orders`,
-  quotes: `SELECT COUNT(*) || ':' || COALESCE(MAX(created_at), '') AS rev FROM quotes`,
-  leads: `SELECT COUNT(*) || ':' || COALESCE(MAX(created_at), '') AS rev FROM leads`,
-  notifications: `SELECT COUNT(*) || ':' || COALESCE(SUM(is_read), 0) AS rev FROM notifications`,
+  orders: `SELECT CONCAT(COUNT(*), ':', COALESCE(MAX(created_at), '')) AS rev FROM orders`,
+  quotes: `SELECT CONCAT(COUNT(*), ':', COALESCE(MAX(created_at), '')) AS rev FROM quotes`,
+  leads: `SELECT CONCAT(COUNT(*), ':', COALESCE(MAX(created_at), '')) AS rev FROM leads`,
+  notifications: `SELECT CONCAT(COUNT(*), ':', COALESCE(SUM(is_read), 0)) AS rev FROM notifications`,
 };
 
 export async function GET(req: Request) {
@@ -42,7 +42,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unknown watch target.' }, { status: 400 });
   }
 
-  const row = one<{ rev: string }>(sql);
+  const row = await one<{ rev: string }>(sql);
 
   return NextResponse.json(
     { revision: row?.rev ?? '' },

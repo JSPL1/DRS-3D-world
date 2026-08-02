@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   }
 
   const { email } = parsed.data;
-  const user = one<{ id: number; email: string; name: string }>(
+  const user = await one<{ id: number; email: string; name: string }>(
     `SELECT id, email, name FROM users WHERE email = ?`,
     [email],
   );
@@ -41,15 +41,15 @@ export async function POST(req: Request) {
 
   if (user) {
     // One live code per user: retire anything outstanding first.
-    run(
-      `UPDATE otp_codes SET consumed_at = datetime('now')
+    await run(
+      `UPDATE otp_codes SET consumed_at = NOW()
        WHERE user_id = ? AND purpose = 'password_reset' AND consumed_at IS NULL`,
       [user.id],
     );
-    run(
+    await run(
       `INSERT INTO otp_codes (user_id, code_hash, purpose, expires_at)
-       VALUES (?, ?, 'password_reset', datetime('now', ?))`,
-      [user.id, bcrypt.hashSync(code, 10), `+${OTP_TTL_MINUTES} minutes`],
+       VALUES (?, ?, 'password_reset', DATE_ADD(NOW(), INTERVAL ? MINUTE))`,
+      [user.id, bcrypt.hashSync(code, 10), OTP_TTL_MINUTES],
     );
     await sendOtpEmail(user.email, code, OTP_TTL_MINUTES, {
       purpose: 'reset',

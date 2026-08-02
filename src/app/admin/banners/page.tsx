@@ -8,7 +8,7 @@ export const metadata = { title: 'Banners' };
 export default async function AdminBannersPage() {
   await requirePermission('banners.edit');
 
-  const banners = all<{
+  const banners = await all<{
     id: number;
     title: string;
     subtitle: string | null;

@@ -9,7 +9,7 @@ export const metadata = { title: 'Brands' };
 export default async function AdminBrandsPage() {
   await requirePermission('brands.edit');
 
-  const brands = all<{
+  const brands = await all<{
     id: number;
     name: string;
     slug: string;

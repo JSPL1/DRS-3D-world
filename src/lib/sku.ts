@@ -19,12 +19,12 @@ import { one } from '@/lib/db';
 const PREFIX = 'DRS-';
 const WIDTH = 5;
 
-export function nextSku(): string {
+export async function nextSku(): Promise<string> {
   // Only codes in this exact shape are considered. Older hand-written ones
   // (DRS-ST-HNM-001) are left out of the sequence rather than parsed.
-  const highest = one<{ sku: string }>(
+  const highest = await one<{ sku: string }>(
     `SELECT sku FROM products
-     WHERE sku GLOB '${PREFIX}[0-9][0-9][0-9][0-9][0-9]'
+     WHERE sku REGEXP '^${PREFIX}[0-9]{5}$'
      ORDER BY sku DESC LIMIT 1`,
   );
 
@@ -34,7 +34,7 @@ export function nextSku(): string {
   // A hand-written code could still occupy the slot we are about to issue.
   for (;;) {
     const candidate = `${PREFIX}${String(next).padStart(WIDTH, '0')}`;
-    const taken = one<{ id: number }>(`SELECT id FROM products WHERE sku = ?`, [candidate]);
+    const taken = await one<{ id: number }>(`SELECT id FROM products WHERE sku = ?`, [candidate]);
     if (!taken) return candidate;
     next += 1;
   }

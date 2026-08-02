@@ -24,7 +24,7 @@ export default async function RegisterPage({
   if (await getCurrentUser()) redirect('/account');
 
   const params = await searchParams;
-  const settings = getSettings();
+  const settings = await getSettings();
 
   return (
     <RegisterForm

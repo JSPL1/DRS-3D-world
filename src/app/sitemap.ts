@@ -5,7 +5,7 @@ import { site } from '@/lib/site';
 
 export const revalidate = 3600;
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = site.url.replace(/\/$/, '');
   const now = new Date();
 
@@ -23,14 +23,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/contact`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
   ];
 
-  const products: MetadataRoute.Sitemap = getAllProductSlugs().map((product) => ({
+  const productSlugs = await getAllProductSlugs();
+  const products: MetadataRoute.Sitemap = productSlugs.map((product) => ({
     url: `${base}/products/${product.slug}`,
     lastModified: product.updated_at ? new Date(product.updated_at.replace(' ', 'T') + 'Z') : now,
     changeFrequency: 'weekly',
     priority: 0.8,
   }));
 
-  const posts: MetadataRoute.Sitemap = getBlogPosts(200).map((post) => ({
+  const blogPosts = await getBlogPosts(200);
+  const posts: MetadataRoute.Sitemap = blogPosts.map((post) => ({
     url: `${base}/blog/${post.slug}`,
     lastModified: post.published_at ? new Date(post.published_at.replace(' ', 'T') + 'Z') : now,
     changeFrequency: 'monthly',

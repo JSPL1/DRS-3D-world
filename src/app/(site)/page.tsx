@@ -45,12 +45,12 @@ const CAPABILITIES = [
   'Corporate Gifts', 'Custom Figurines', 'Industrial Parts',
 ];
 
-export default function HomePage() {
-  const featured = getFeaturedProducts(6);
-  const testimonials = getTestimonials(6);
-  const branding = getBranding();
+export default async function HomePage() {
+  const featured = await getFeaturedProducts(6);
+  const testimonials = await getTestimonials(6);
+  const branding = await getBranding();
   const sculptUrl = getHeroSculptUrl();
-  const settings = getSettings();
+  const settings = await getSettings();
 
   const hero3d = {
     enabled: settings.hero_3d_enabled !== 'false',

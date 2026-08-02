@@ -25,14 +25,14 @@ export default async function AdminOrdersPage({
   const { status } = await searchParams;
 
   const validStatus = ORDER_STATUSES.includes(status as never) ? status : undefined;
-  const orders = listAdminOrders(validStatus);
+  const orders = await listAdminOrders(validStatus);
   const editable = can(user.role, 'orders.edit');
 
   // Order-level extras (address, gift wrap, notes) shown in the expanded row —
   // not part of listAdminOrders' summary shape, fetched once for this page.
-  const extrasById = new Map(
+  const extraRows =
     orders.length > 0
-      ? all<{
+      ? await all<{
           id: number;
           shipping_address: string | null;
           notes: string | null;
@@ -43,13 +43,13 @@ export default async function AdminOrdersPage({
           `SELECT id, shipping_address, notes, gift_wrap, gift_note, shipping_method
            FROM orders WHERE id IN (${orders.map(() => '?').join(',')})`,
           orders.map((o) => o.id),
-        ).map((e) => [e.id, e])
-      : [],
-  );
+        )
+      : [];
+  const extrasById = new Map(extraRows.map((e) => [e.id, e]));
 
   const ordersWithExtras = orders.map((o) => ({ ...o, ...extrasById.get(o.id) }));
 
-  const items = listOrderItemsForOrders(orders.map((o) => o.id));
+  const items = await listOrderItemsForOrders(orders.map((o) => o.id));
   const itemsByOrder = new Map<number, typeof items>();
   for (const item of items) {
     const list = itemsByOrder.get(item.order_id) ?? [];

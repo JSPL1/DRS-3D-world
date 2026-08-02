@@ -10,7 +10,7 @@ export const metadata = { title: 'Homepage' };
 export default async function AdminHomepagePage() {
   await requirePermission('homepage.edit');
 
-  const sections = all<{
+  const sections = await all<{
     id: number;
     key: string;
     title: string;

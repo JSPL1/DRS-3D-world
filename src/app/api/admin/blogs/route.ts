@@ -19,12 +19,12 @@ const schema = z.object({
   status: z.enum(['draft', 'published', 'archived']),
 });
 
-function uniqueSlug(title: string, excludeId?: number): string {
+async function uniqueSlug(title: string, excludeId?: number): Promise<string> {
   const base = slugify(title) || 'post';
   let slug = base;
   let n = 2;
   while (true) {
-    const existing = one<{ id: number }>(`SELECT id FROM blogs WHERE slug = ?`, [slug]);
+    const existing = await one<{ id: number }>(`SELECT id FROM blogs WHERE slug = ?`, [slug]);
     if (!existing || existing.id === excludeId) return slug;
     slug = `${base}-${n++}`;
   }
@@ -39,19 +39,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
   }
   const b = parsed.data;
-  const slug = uniqueSlug(b.title);
+  const slug = await uniqueSlug(b.title);
 
-  const result = run(
+  const result = await run(
     `INSERT INTO blogs (title, slug, excerpt, content, cover_url, author_id, category, reading_minutes, status, published_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       b.title, slug, b.excerpt || null, b.content || null, b.coverUrl || null, user.id,
       b.category || null, b.readingMinutes, b.status,
-      b.status === 'published' ? new Date().toISOString() : null,
+      b.status === 'published' ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null,
     ],
   );
 
-  logActivity(user.id, user.name, 'created blog post', 'blog', Number(result.lastInsertRowid), b.title);
+  await logActivity(user.id, user.name, 'created blog post', 'blog', Number(result.lastInsertRowid), b.title);
   revalidatePath('/blog');
   revalidatePath('/admin/blogs');
 
@@ -71,7 +71,7 @@ export async function PATCH(req: Request) {
   }
   const b = parsed.data;
 
-  const existing = one<{ slug: string; status: string; published_at: string | null }>(
+  const existing = await one<{ slug: string; status: string; published_at: string | null }>(
     `SELECT slug, status, published_at FROM blogs WHERE id = ?`,
     [b.id],
   );
@@ -81,17 +81,17 @@ export async function PATCH(req: Request) {
   // post doesn't bump it back to "just now".
   const publishedAt =
     b.status === 'published'
-      ? (existing.published_at ?? new Date().toISOString())
+      ? (existing.published_at ?? new Date().toISOString().slice(0, 19).replace('T', ' '))
       : existing.status === 'published' ? existing.published_at : null;
 
-  run(
+  await run(
     `UPDATE blogs SET title = ?, excerpt = ?, content = ?, cover_url = ?, category = ?,
-                      reading_minutes = ?, status = ?, published_at = ?, updated_at = datetime('now')
+                      reading_minutes = ?, status = ?, published_at = ?, updated_at = NOW()
      WHERE id = ?`,
     [b.title, b.excerpt || null, b.content || null, b.coverUrl || null, b.category || null, b.readingMinutes, b.status, publishedAt, b.id],
   );
 
-  logActivity(user.id, user.name, 'updated blog post', 'blog', b.id, b.title);
+  await logActivity(user.id, user.name, 'updated blog post', 'blog', b.id, b.title);
   revalidatePath('/blog');
   revalidatePath(`/blog/${existing.slug}`);
   revalidatePath('/admin/blogs');
@@ -108,11 +108,11 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Invalid id.' }, { status: 400 });
   }
 
-  const existing = one<{ title: string; slug: string }>(`SELECT title, slug FROM blogs WHERE id = ?`, [id]);
+  const existing = await one<{ title: string; slug: string }>(`SELECT title, slug FROM blogs WHERE id = ?`, [id]);
   if (!existing) return NextResponse.json({ error: 'Post not found.' }, { status: 404 });
 
-  run(`DELETE FROM blogs WHERE id = ?`, [id]);
-  logActivity(user.id, user.name, 'deleted blog post', 'blog', id, existing.title);
+  await run(`DELETE FROM blogs WHERE id = ?`, [id]);
+  await logActivity(user.id, user.name, 'deleted blog post', 'blog', id, existing.title);
   revalidatePath('/blog');
   revalidatePath('/admin/blogs');
 

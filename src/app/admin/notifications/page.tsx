@@ -20,7 +20,7 @@ const TYPE_STYLES: Record<string, string> = {
 
 export default async function AdminNotificationsPage() {
   await requirePermission('notifications.view');
-  const notifications = getNotifications(60);
+  const notifications = await getNotifications(60);
 
   const unread = notifications.filter((n) => n.is_read === 0).length;
 

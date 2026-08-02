@@ -7,7 +7,7 @@ export const metadata = { title: 'Coupons' };
 
 export default async function AdminCouponsPage() {
   await requirePermission('coupons.edit');
-  const coupons = listAdminCoupons();
+  const coupons = await listAdminCoupons();
 
   return (
     <>

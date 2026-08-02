@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { guard } from '@/lib/auth/api-guard';
 import { logActivity } from '@/lib/auth/session';
-import { all, getDb, one, run } from '@/lib/db';
+import { all, getPool, one, run } from '@/lib/db';
 
 export const runtime = 'nodejs';
 
@@ -34,7 +34,7 @@ const orderSchema = z.object({
   ids: z.array(z.number().int().positive()).max(200),
 });
 
-function productOr404(productId: number) {
+async function productOr404(productId: number) {
   return one<{ id: number; name: string; slug: string }>(
     `SELECT id, name, slug FROM products WHERE id = ?`,
     [productId],
@@ -56,29 +56,35 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
   }
 
-  const product = productOr404(parsed.data.productId);
+  const product = await productOr404(parsed.data.productId);
   if (!product) return NextResponse.json({ error: 'Product not found.' }, { status: 404 });
 
-  const db = getDb();
-  const last = one<{ max: number | null }>(
+  const last = await one<{ max: number | null }>(
     `SELECT MAX(sort_order) AS max FROM product_images WHERE product_id = ? AND kind = 'gallery'`,
     [product.id],
   );
   let order = (last?.max ?? -1) + 1;
 
-  const insert = db.prepare(
-    `INSERT INTO product_images (product_id, url, alt, kind, sort_order)
-     VALUES (?, ?, ?, 'gallery', ?)`,
-  );
-
-  db.transaction(() => {
+  const conn = await getPool().getConnection();
+  try {
+    await conn.beginTransaction();
     for (const image of parsed.data.images) {
-      insert.run(product.id, image.url, image.alt?.trim() || product.name, order);
+      await conn.query(
+        `INSERT INTO product_images (product_id, url, alt, kind, sort_order)
+         VALUES (?, ?, ?, 'gallery', ?)`,
+        [product.id, image.url, image.alt?.trim() || product.name, order],
+      );
       order += 1;
     }
-  })();
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 
-  logActivity(
+  await logActivity(
     user.id, user.name, 'added product photos', 'product', product.id,
     `${parsed.data.images.length} photo(s) on ${product.name}`,
   );
@@ -97,23 +103,31 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
   }
 
-  const product = productOr404(parsed.data.productId);
+  const product = await productOr404(parsed.data.productId);
   if (!product) return NextResponse.json({ error: 'Product not found.' }, { status: 404 });
 
   // Only ids that actually belong to this product are touched, so a crafted
   // request can't reorder someone else's gallery.
-  const owned = new Set(
-    all<{ id: number }>(
-      `SELECT id FROM product_images WHERE product_id = ? AND kind = 'gallery'`,
-      [product.id],
-    ).map((r) => r.id),
+  const ownedRows = await all<{ id: number }>(
+    `SELECT id FROM product_images WHERE product_id = ? AND kind = 'gallery'`,
+    [product.id],
   );
+  const owned = new Set(ownedRows.map((r) => r.id));
 
-  const db = getDb();
-  const update = db.prepare(`UPDATE product_images SET sort_order = ? WHERE id = ?`);
-  db.transaction(() => {
-    parsed.data.ids.filter((id) => owned.has(id)).forEach((id, index) => update.run(index, id));
-  })();
+  const conn = await getPool().getConnection();
+  try {
+    await conn.beginTransaction();
+    const toUpdate = parsed.data.ids.filter((id) => owned.has(id));
+    for (const [index, id] of toUpdate.entries()) {
+      await conn.query(`UPDATE product_images SET sort_order = ? WHERE id = ?`, [index, id]);
+    }
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 
   revalidateFor(product.slug);
   return NextResponse.json({ ok: true });
@@ -129,19 +143,19 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Invalid image id.' }, { status: 400 });
   }
 
-  const image = one<{ product_id: number; url: string }>(
+  const image = await one<{ product_id: number; url: string }>(
     `SELECT product_id, url FROM product_images WHERE id = ?`,
     [id],
   );
   if (!image) return NextResponse.json({ error: 'Image not found.' }, { status: 404 });
 
-  const product = productOr404(image.product_id);
+  const product = await productOr404(image.product_id);
 
   // The row goes; the file stays. It may be in use as a colour photograph or
   // referenced by an older order, and deleting it would break those silently.
-  run(`DELETE FROM product_images WHERE id = ?`, [id]);
+  await run(`DELETE FROM product_images WHERE id = ?`, [id]);
 
-  logActivity(user.id, user.name, 'removed product photo', 'product', image.product_id, image.url);
+  await logActivity(user.id, user.name, 'removed product photo', 'product', image.product_id, image.url);
   if (product) revalidateFor(product.slug);
 
   return NextResponse.json({ ok: true });

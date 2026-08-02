@@ -22,11 +22,11 @@ const GROUPS: SettingGroup[] = [
 
 export default async function AdminSeoPage() {
   await requirePermission('seo.edit');
-  const settings = getSettings();
+  const settings = await getSettings();
 
   // Anything published without its own metadata falls back to the site default,
   // which is worth surfacing rather than leaving to chance.
-  const products = all<{
+  const products = await all<{
     id: number;
     name: string;
     slug: string;

@@ -34,13 +34,13 @@ export async function POST(req: Request) {
 
   const lead = parsed.data;
 
-  run(
+  await run(
     `INSERT INTO leads (name, email, phone, company, subject, message, source, status)
      VALUES (?, ?, ?, ?, ?, ?, 'contact_form', 'new')`,
     [lead.name, lead.email, lead.phone || null, lead.company || null, lead.subject, lead.message],
   );
 
-  run(
+  await run(
     `INSERT INTO notifications (title, body, type, href) VALUES (?, ?, 'lead', '/admin/leads')`,
     [`New enquiry from ${lead.name}`, lead.subject],
   );

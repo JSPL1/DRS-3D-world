@@ -1,11 +1,11 @@
 import 'server-only';
 
-import type Database from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
+import type mysql from 'mysql2/promise';
 
 /**
  * First-run seed. Runs inside a transaction and only when the users table is
- * empty, so a fresh Render deploy comes up with a populated, demoable site.
+ * empty, so a fresh deploy comes up with a populated, demoable site.
  */
 
 const img = (title: string, seed: number, w = 1200, h = 900) =>
@@ -13,35 +13,46 @@ const img = (title: string, seed: number, w = 1200, h = 900) =>
 
 const DEMO_PASSWORD = process.env.SEED_PASSWORD ?? 'Drs@12345';
 
-export function seedIfEmpty(db: Database.Database) {
-  const existing = db.prepare('SELECT COUNT(*) AS c FROM users').get() as { c: number };
-  if (existing.c > 0) return;
+/** Turns SQLite's `datetime('now', spec)` offsets into an actual MySQL DATETIME literal. */
+function offsetDate(spec: string): string {
+  const match = /^([+-]?\d+)\s+(minute|hour|day)s?$/.exec(spec.trim());
+  const ms = Date.now();
+  const date = new Date(ms);
+  if (match) {
+    const amount = Number(match[1]);
+    const unit = match[2];
+    if (unit === 'minute') date.setMinutes(date.getMinutes() + amount);
+    if (unit === 'hour') date.setHours(date.getHours() + amount);
+    if (unit === 'day') date.setDate(date.getDate() + amount);
+  }
+  return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+export async function seedIfEmpty(pool: mysql.Pool) {
+  const [existingRows] = await pool.query<mysql.RowDataPacket[]>('SELECT COUNT(*) AS c FROM users');
+  if ((existingRows[0] as { c: number }).c > 0) return;
 
   const hash = bcrypt.hashSync(DEMO_PASSWORD, 10);
 
-  db.transaction(() => {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const insert = async (sql: string, params: unknown[] = []) => {
+      const [result] = await conn.query<mysql.ResultSetHeader>(sql, params);
+      return result.insertId;
+    };
+
     /* ---------------- Users: one per role ---------------- */
-    const insertUser = db.prepare(
-      `INSERT INTO users (name, email, phone, password_hash, role, status)
-       VALUES (?, ?, ?, ?, ?, 'active')`,
-    );
-    const adminId = Number(
-      insertUser.run('DRS Administrator', 'drs3dworld@gmail.com', '6371989465', hash, 'admin')
-        .lastInsertRowid,
-    );
-    insertUser.run('Production Manager', 'manager@drs3dworld.com', '6371989466', hash, 'manager');
-    insertUser.run('Sales Executive', 'sales@drs3dworld.com', '6371989467', hash, 'sales');
-    const customerId = Number(
-      insertUser.run('Ananya Mohanty', 'customer@example.com', '9861000001', hash, 'customer')
-        .lastInsertRowid,
-    );
-    insertUser.run('Read Only', 'viewer@drs3dworld.com', null, hash, 'viewer');
+    const userSql = `INSERT INTO users (name, email, phone, password_hash, role, status)
+       VALUES (?, ?, ?, ?, ?, 'active')`;
+    const adminId = await insert(userSql, ['DRS Administrator', 'drs3dworld@gmail.com', '6371989465', hash, 'admin']);
+    await insert(userSql, ['Production Manager', 'manager@drs3dworld.com', '6371989466', hash, 'manager']);
+    await insert(userSql, ['Sales Executive', 'sales@drs3dworld.com', '6371989467', hash, 'sales']);
+    await insert(userSql, ['Ananya Mohanty', 'customer@example.com', '9861000001', hash, 'customer']);
+    await insert(userSql, ['Read Only', 'viewer@drs3dworld.com', null, hash, 'viewer']);
 
     /* ---------------- Categories ---------------- */
-    const insertCat = db.prepare(
-      `INSERT INTO categories (name, slug, description, icon, sort_order, image_url)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    );
     const categories: Array<[string, string, string, string]> = [
       ['Statues & Idols', 'statues-idols', 'Devotional and decorative figures printed in fine detail.', 'Sparkles'],
       ['Custom Figurines', 'custom-figurines', 'Personalised miniatures printed from your photographs.', 'Users'],
@@ -57,29 +68,27 @@ export function seedIfEmpty(db: Database.Database) {
       ['Automobile Parts', 'automobile-parts', 'Jigs, fixtures and trim under the bonnet.', 'Car'],
     ];
     const catIds: Record<string, number> = {};
-    categories.forEach(([name, slug, description, icon], i) => {
-      catIds[slug] = Number(
-        insertCat.run(name, slug, description, icon, i, img(name, i + 11, 800, 600)).lastInsertRowid,
+    for (const [i, [name, slug, description, icon]] of categories.entries()) {
+      catIds[slug] = await insert(
+        `INSERT INTO categories (name, slug, description, icon, sort_order, image_url) VALUES (?, ?, ?, ?, ?, ?)`,
+        [name, slug, description, icon, i, img(name, i + 11, 800, 600)],
       );
-    });
+    }
 
     /* ---------------- Brands / material partners ---------------- */
-    const insertBrand = db.prepare(
-      `INSERT INTO brands (name, slug, description, website) VALUES (?, ?, ?, ?)`,
-    );
-    const brands = [
+    const brands: Array<[string, string, string, string | null]> = [
       ['DRS Signature', 'drs-signature', 'Our own in-house finished range.', null],
       ['Bambu Lab', 'bambu-lab', 'High-speed CoreXY production platform.', 'https://bambulab.com'],
       ['Prusa Research', 'prusa-research', 'Open-source FDM workhorses.', 'https://prusa3d.com'],
       ['Formlabs', 'formlabs', 'Precision SLA resin systems.', 'https://formlabs.com'],
     ];
     const brandIds: Record<string, number> = {};
-    brands.forEach(([n, s, d, w]) => {
-      brandIds[s as string] = Number(insertBrand.run(n, s, d, w).lastInsertRowid);
-    });
+    for (const [n, s, d, w] of brands) {
+      brandIds[s] = await insert(`INSERT INTO brands (name, slug, description, website) VALUES (?, ?, ?, ?)`, [n, s, d, w]);
+    }
 
     /* ---------------- Products ---------------- */
-    const insertProduct = db.prepare(`
+    const productInsertSql = `
       INSERT INTO products (
         name, slug, sku, category_id, brand_id, short_description, description,
         features, specifications, price, discount_price, stock, availability,
@@ -88,22 +97,8 @@ export function seedIfEmpty(db: Database.Database) {
         is_featured, is_trending, is_popular, is_new_arrival, is_best_seller,
         youtube_url, seo_title, seo_description, meta_keywords,
         rating_avg, rating_count, view_count, sort_order
-      ) VALUES (
-        @name, @slug, @sku, @category_id, @brand_id, @short_description, @description,
-        @features, @specifications, @price, @discount_price, @stock, @availability,
-        @length_mm, @width_mm, @height_mm, @weight_g, @material, @print_technology,
-        @print_time_hours, @layer_height_mm, @infill_percent, @color,
-        @is_featured, @is_trending, @is_popular, @is_new_arrival, @is_best_seller,
-        @youtube_url, @seo_title, @seo_description, @meta_keywords,
-        @rating_avg, @rating_count, @view_count, @sort_order
-      )
-    `);
-    const insertImage = db.prepare(
-      `INSERT INTO product_images (product_id, url, alt, kind, sort_order) VALUES (?, ?, ?, ?, ?)`,
-    );
-    const insertTag = db.prepare(
-      `INSERT OR IGNORE INTO product_tags (product_id, tag) VALUES (?, ?)`,
-    );
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
 
     type Seed = {
       name: string;
@@ -570,71 +565,46 @@ export function seedIfEmpty(db: Database.Database) {
 
     const productIds: number[] = [];
 
-    productSeeds.forEach((p, i) => {
+    for (const [i, p] of productSeeds.entries()) {
       const slug = slugify(p.name);
-      const id = Number(
-        insertProduct.run({
-          name: p.name,
-          slug,
-          sku: p.sku,
-          category_id: catIds[p.category],
-          brand_id: brandIds[p.brand],
-          short_description: p.short,
-          description: p.description,
-          features: JSON.stringify(p.features),
-          specifications: JSON.stringify(p.specs),
-          price: p.price,
-          discount_price: p.discount ?? null,
-          stock: p.stock,
-          availability: p.stock > 0 ? 'in_stock' : 'made_to_order',
-          length_mm: p.dims[0],
-          width_mm: p.dims[1],
-          height_mm: p.dims[2],
-          weight_g: p.weight,
-          material: p.material,
-          print_technology: p.tech,
-          print_time_hours: p.hours,
-          layer_height_mm: p.layer,
-          infill_percent: p.infill,
-          color: p.color,
-          is_featured: p.flags?.featured ? 1 : 0,
-          is_trending: p.flags?.trending ? 1 : 0,
-          is_popular: p.flags?.popular ? 1 : 0,
-          is_new_arrival: p.flags?.newArrival ? 1 : 0,
-          is_best_seller: p.flags?.bestSeller ? 1 : 0,
-          youtube_url: null,
-          // No site-name suffix: the metadata template appends it, and
-          // including it here produced "… | DRS 3D WORLD | DRS 3D WORLD".
-          seo_title: p.name,
-          seo_description: p.short,
-          meta_keywords: p.tags.join(', '),
-          rating_avg: p.rating[0],
-          rating_count: p.rating[1],
-          view_count: 120 + i * 37,
-          sort_order: i,
-        }).lastInsertRowid,
-      );
+      const id = await insert(productInsertSql, [
+        p.name, slug, p.sku, catIds[p.category], brandIds[p.brand], p.short, p.description,
+        JSON.stringify(p.features), JSON.stringify(p.specs), p.price, p.discount ?? null,
+        p.stock, p.stock > 0 ? 'in_stock' : 'made_to_order',
+        p.dims[0], p.dims[1], p.dims[2], p.weight, p.material, p.tech,
+        p.hours, p.layer, p.infill, p.color,
+        p.flags?.featured ? 1 : 0, p.flags?.trending ? 1 : 0, p.flags?.popular ? 1 : 0,
+        p.flags?.newArrival ? 1 : 0, p.flags?.bestSeller ? 1 : 0,
+        null, p.name, p.short, p.tags.join(', '),
+        p.rating[0], p.rating[1], 120 + i * 37, i,
+      ]);
       productIds.push(id);
 
       // Gallery + a small 360 ring so the viewer has frames to spin through.
       for (let k = 0; k < 4; k++) {
-        insertImage.run(id, img(p.name, id * 10 + k), `${p.name} — view ${k + 1}`, 'gallery', k);
+        await conn.query(
+          `INSERT INTO product_images (product_id, url, alt, kind, sort_order) VALUES (?, ?, ?, 'gallery', ?)`,
+          [id, img(p.name, id * 10 + k), `${p.name} — view ${k + 1}`, k],
+        );
       }
       for (let k = 0; k < 24; k++) {
-        insertImage.run(id, img(`${p.name} ${k * 15}°`, id * 100 + k, 900, 900), `${p.name} — ${k * 15}°`, '360', k);
+        await conn.query(
+          `INSERT INTO product_images (product_id, url, alt, kind, sort_order) VALUES (?, ?, ?, '360', ?)`,
+          [id, img(`${p.name} ${k * 15}°`, id * 100 + k, 900, 900), `${p.name} — ${k * 15}°`, k],
+        );
       }
-      p.tags.forEach((t) => insertTag.run(id, t));
-    });
+      for (const t of p.tags) {
+        await conn.query(`INSERT IGNORE INTO product_tags (product_id, tag) VALUES (?, ?)`, [id, t]);
+      }
+    }
 
     // Relate every product to its two neighbours — enough for the carousel.
-    const insertRel = db.prepare(
-      `INSERT OR IGNORE INTO product_relations (product_id, related_id) VALUES (?, ?)`,
-    );
-    productIds.forEach((id, i) => {
-      insertRel.run(id, productIds[(i + 1) % productIds.length]);
-      insertRel.run(id, productIds[(i + 2) % productIds.length]);
-      insertRel.run(id, productIds[(i + 5) % productIds.length]);
-    });
+    for (const [i, id] of productIds.entries()) {
+      const relSql = `INSERT IGNORE INTO product_relations (product_id, related_id) VALUES (?, ?)`;
+      await conn.query(relSql, [id, productIds[(i + 1) % productIds.length]]);
+      await conn.query(relSql, [id, productIds[(i + 2) % productIds.length]]);
+      await conn.query(relSql, [id, productIds[(i + 5) % productIds.length]]);
+    }
 
     /* ----------------------------------------------------------------
        Orders and quotes are deliberately NOT seeded.
@@ -653,10 +623,8 @@ export function seedIfEmpty(db: Database.Database) {
     const rnd = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
 
     /* ---------------- Leads ---------------- */
-    const insertLead = db.prepare(
-      `INSERT INTO leads (name, email, phone, company, subject, message, source, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now', ?))`,
-    );
+    const leadSql = `INSERT INTO leads (name, email, phone, company, subject, message, source, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const leads: Array<[string, string, string, string, string, string, string, string, string]> = [
       ['Rakesh Sahoo', 'rakesh@example.com', '9861100001', 'Sahoo Industries', 'Bulk prototype enquiry', 'We need 40 functional prototypes of a housing in ABS. Can you quote for a monthly repeat order?', 'contact_form', 'qualified', '-2 days'],
       ['Priya Nayak', 'priya@example.com', '9861100002', '', 'Wedding couple statue', 'Looking for a couple statue for my sister\'s wedding on the 14th. Is that timeline possible?', 'contact_form', 'contacted', '-4 days'],
@@ -667,29 +635,28 @@ export function seedIfEmpty(db: Database.Database) {
       ['Lipsa Panda', 'lipsa@example.com', '9861100007', '', 'Hanuman statue 600mm', 'Do you make the Hanuman statue in the 600 mm size? What is the price?', 'contact_form', 'new', '-1 days'],
       ['Kiran Jena', 'kiran@example.com', '9861100008', 'Jena Architects', '1:200 tower model', 'We have a Revit model ready. Need it by month end for a client presentation.', 'contact_form', 'lost', '-16 days'],
     ];
-    leads.forEach((l) => insertLead.run(...l));
+    for (const l of leads) {
+      await conn.query(leadSql, [...l.slice(0, 8), offsetDate(l[8])]);
+    }
 
     /* ---------------- Testimonials ---------------- */
-    const insertTestimonial = db.prepare(
-      `INSERT INTO testimonials (author_name, author_role, company, quote, rating, is_featured, sort_order, avatar_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
-    [
+    const testimonialSql = `INSERT INTO testimonials (author_name, author_role, company, quote, rating, is_featured, sort_order, avatar_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+    const testimonials: Array<[string, string, string, string, number, number]> = [
       ['Rakesh Sahoo', 'Head of Production', 'Sahoo Industries', 'We had a housing redesign stuck for three weeks waiting on a supplier. DRS turned the first article around in two days and caught a wall-thickness problem our own CAD team had missed.', 5, 1],
       ['Dr. S. Mishra', 'Consultant Cardiologist', 'City Hospital', 'The cardiac model was accurate enough that we rehearsed the approach on it the evening before. It changed how we planned the procedure.', 5, 1],
       ['Priya Nayak', 'Customer', '', 'They sent a render for approval, I asked for the saree drape to change, and they redid it without a word of complaint. My sister cried when she opened it.', 5, 1],
       ['Kiran Jena', 'Principal Architect', 'Jena Architects', 'The edge-lit base was their suggestion, not ours, and it was the thing the client photographed. Genuinely good instincts.', 5, 0],
       ['Vikram Singh', 'Project Lead', 'Defence Labs', 'Twenty-five frames, all within tolerance, delivered a day early. We have not needed to look elsewhere since.', 5, 0],
       ['Sneha Rout', 'Owner', 'Rout Jewellers', 'Burnout is completely clean. My caster asked me where I was getting them done.', 5, 0],
-    ].forEach((t, i) =>
-      insertTestimonial.run(t[0], t[1], t[2], t[3], t[4], t[5], i, img(String(t[0]), 500 + i, 200, 200)),
-    );
+    ];
+    for (const [i, t] of testimonials.entries()) {
+      await conn.query(testimonialSql, [t[0], t[1], t[2], t[3], t[4], t[5], i, img(t[0], 500 + i, 200, 200)]);
+    }
 
     /* ---------------- FAQs ---------------- */
-    const insertFaq = db.prepare(
-      `INSERT INTO faqs (question, answer, category, sort_order) VALUES (?, ?, ?, ?)`,
-    );
-    [
+    const faqSql = `INSERT INTO faqs (question, answer, category, sort_order) VALUES (?, ?, ?, ?)`;
+    const faqs: Array<[string, string, string]> = [
       ['What file formats do you accept?', 'STL, OBJ, 3MF, STEP, IGES and native Rhino or SketchUp files. If your file is in something else, send it across — we can usually open it or convert it for you.', 'Files'],
       ['How long does a typical print take?', 'Small parts are usually ready the next working day. Larger assemblies and multi-part models take 5–14 working days depending on finishing. Every quote carries a specific date, not a range.', 'Lead time'],
       ['Do you print in colour?', 'Yes. Full-colour resin for figurines and models, and hand-painting for pieces that need it. For single-colour parts we stock over thirty filament colours.', 'Materials'],
@@ -698,14 +665,17 @@ export function seedIfEmpty(db: Database.Database) {
       ['Do you deliver outside Bhubaneswar?', 'We ship across India. Local delivery within Bhubaneswar is free on orders above ₹10,000.', 'Delivery'],
       ['Will you tell me if my design will not print?', 'Always, before we take payment. Thin walls, unsupported overhangs and trapped volumes get flagged with a written note and a suggested fix.', 'Files'],
       ['Do you do one-off pieces or only bulk?', 'Both. A single custom figurine is as welcome as a run of 500 corporate awards.', 'Commercial'],
-    ].forEach((f, i) => insertFaq.run(f[0], f[1], f[2], i));
+    ];
+    for (const [i, f] of faqs.entries()) {
+      await conn.query(faqSql, [f[0], f[1], f[2], i]);
+    }
 
     /* ---------------- Blog ---------------- */
-    const insertBlog = db.prepare(`
+    const blogSql = `
       INSERT INTO blogs (title, slug, excerpt, content, cover_url, author_id, category, tags,
                          reading_minutes, status, view_count, seo_title, seo_description, published_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, datetime('now', ?))
-    `);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?)
+    `;
     const posts = [
       {
         title: 'FDM or SLA: choosing the right process for your part',
@@ -748,20 +718,18 @@ export function seedIfEmpty(db: Database.Database) {
         content: `## PLA\n\nStiff, dimensionally accurate, prints beautifully, and softens at around 55 °C. Perfect for display pieces and architectural models. Useless in a car in May.\n\n## PETG\n\nTougher than PLA, survives to about 75 °C, and takes impact without shattering. Our default for anything a student will drop.\n\n## ABS\n\nGood to 95 °C and vapour-smoothable to a sealed surface. Needs an enclosed heated chamber or it warps across any length. We print it in enclosures only.\n\n## PA-CF\n\nCarbon-fibre nylon. Stiff, light, and it flexes and returns rather than shattering. Everything that flies or crashes gets printed in this.\n\n## Tough resin\n\nWhere detail matters more than toughness. Figurines, jewellery masters, medical models. Keep it out of direct sunlight.`,
       },
     ];
-    posts.forEach((p) => {
+    for (const p of posts) {
       const slug = slugify(p.title);
-      insertBlog.run(
+      await conn.query(blogSql, [
         p.title, slug, p.excerpt, p.content, img(p.title, 900 + p.minutes, 1600, 900),
         adminId, p.category, JSON.stringify(p.tags), p.minutes, p.views,
-        p.title, p.excerpt, p.days,
-      );
-    });
+        p.title, p.excerpt, offsetDate(p.days),
+      ]);
+    }
 
     /* ---------------- Gallery ---------------- */
-    const insertGallery = db.prepare(
-      `INSERT INTO gallery_items (title, caption, url, thumb_url, media_type, category, width, height, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
+    const gallerySql = `INSERT INTO gallery_items (title, caption, url, thumb_url, media_type, category, width, height, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const galleryTitles = [
       'Hanuman murti — bronze patina', 'Couple statue — hand painted', 'Voronoi lamp lit',
       'Planetary gearbox exploded', 'Tower model — edge lit base', 'Cardiac model sectioned',
@@ -771,54 +739,49 @@ export function seedIfEmpty(db: Database.Database) {
       'Colour matching session', 'Ganesh idol — 450mm', 'Miniature terrain set',
       'Architectural podium detail', 'Filament wall',
     ];
-    galleryTitles.forEach((t, i) => {
+    for (const [i, t] of galleryTitles.entries()) {
       const tall = i % 3 === 0;
-      insertGallery.run(
+      await conn.query(gallerySql, [
         t, t, img(t, 300 + i, tall ? 800 : 1200, tall ? 1200 : 800),
         img(t, 300 + i, 400, tall ? 600 : 400),
         i % 7 === 0 ? 'before_after' : i % 5 === 0 ? 'video' : 'image',
         i % 4 === 0 ? 'Statues' : i % 3 === 0 ? 'Engineering' : 'Studio',
         tall ? 800 : 1200, tall ? 1200 : 800, i,
-      );
-    });
+      ]);
+    }
 
     /* ---------------- Videos ---------------- */
-    const insertVideo = db.prepare(
-      `INSERT INTO videos (title, description, thumb_url, duration_sec, category, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    );
-    [
+    const videoSql = `INSERT INTO videos (title, description, thumb_url, duration_sec, category, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?)`;
+    const videos: Array<[string, string, number, string]> = [
       ['Hanuman statue — 14 hours in 60 seconds', 'A full SLA build compressed into a minute.', 62, 'Timelapse'],
       ['Planetary gearbox printed fully assembled', 'Off the plate and turning, no assembly.', 48, 'Engineering'],
       ['Voronoi lamp — light test', 'What the lattice does to a dark room.', 35, 'Product'],
       ['Inside the DRS print farm', 'A walk through the floor at full capacity.', 128, 'Studio'],
       ['Support removal, start to finish', 'The unglamorous half of resin printing.', 95, 'Process'],
       ['Tower model assembly timelapse', 'Four sections becoming one building.', 110, 'Architecture'],
-    ].forEach((v, i) => insertVideo.run(v[0], v[1], img(String(v[0]), 700 + i, 1280, 720), v[2], v[3], i));
+    ];
+    for (const [i, v] of videos.entries()) {
+      await conn.query(videoSql, [v[0], v[1], img(v[0], 700 + i, 1280, 720), v[2], v[3], i]);
+    }
 
     /* ---------------- Banners ---------------- */
-    const insertBanner = db.prepare(
-      `INSERT INTO banners (title, subtitle, image_url, cta_label, cta_href, placement, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    );
-    insertBanner.run('Bringing your ideas to life', 'One layer at a time', img('Hero', 1, 1920, 1080), 'Get an instant quote', '/quote', 'home_hero', 0);
-    insertBanner.run('Next-day prototyping', 'Files in before noon, part in your hands tomorrow', img('Prototype', 2, 1920, 700), 'Upload your file', '/quote', 'home_mid', 1);
+    const bannerSql = `INSERT INTO banners (title, subtitle, image_url, cta_label, cta_href, placement, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`;
+    await conn.query(bannerSql, ['Bringing your ideas to life', 'One layer at a time', img('Hero', 1, 1920, 1080), 'Get an instant quote', '/quote', 'home_hero', 0]);
+    await conn.query(bannerSql, ['Next-day prototyping', 'Files in before noon, part in your hands tomorrow', img('Prototype', 2, 1920, 700), 'Upload your file', '/quote', 'home_mid', 1]);
 
     /* ---------------- Coupons ---------------- */
-    const insertCoupon = db.prepare(
-      `INSERT INTO coupons (code, description, type, value, min_order, max_discount, usage_limit, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', ?))`,
-    );
-    insertCoupon.run('DRS10', 'Ten percent off your first order', 'percent', 10, 2000, 2500, 500, '+90 days');
-    insertCoupon.run('FESTIVE500', 'Flat ₹500 off orders above ₹5,000', 'fixed', 500, 5000, null, 200, '+45 days');
-    insertCoupon.run('BULK15', 'Fifteen percent off orders above ₹25,000', 'percent', 15, 25000, 10000, 100, '+180 days');
+    const couponSql = `INSERT INTO coupons (code, description, type, value, min_order, max_discount, usage_limit, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+    await conn.query(couponSql, ['DRS10', 'Ten percent off your first order', 'percent', 10, 2000, 2500, 500, offsetDate('90 days')]);
+    await conn.query(couponSql, ['FESTIVE500', 'Flat ₹500 off orders above ₹5,000', 'fixed', 500, 5000, null, 200, offsetDate('45 days')]);
+    await conn.query(couponSql, ['BULK15', 'Fifteen percent off orders above ₹25,000', 'percent', 15, 25000, 10000, 100, offsetDate('180 days')]);
 
     /* ---------------- Homepage builder sections ---------------- */
-    const insertSection = db.prepare(
-      `INSERT INTO homepage_sections (key, title, subtitle, config, sort_order, is_enabled)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    );
-    [
+    const sectionSql = `INSERT INTO homepage_sections (\`key\`, title, subtitle, config, sort_order, is_enabled)
+       VALUES (?, ?, ?, ?, ?, ?)`;
+    const sections: Array<[string, string, string, string]> = [
       ['hero', 'Cinematic 3D hero', 'Live printer, scroll-driven teardown', '{"autoplay":true,"quality":"auto"}'],
       ['marquee', 'Capability marquee', 'Scrolling capability strip', '{"speed":30}'],
       ['services', 'What we do', 'Six core services', '{"columns":3}'],
@@ -829,13 +792,14 @@ export function seedIfEmpty(db: Database.Database) {
       ['testimonials', 'What clients say', 'Rotating quotes', '{"limit":6}'],
       ['gallery', 'From the floor', 'Masonry gallery preview', '{"limit":8}'],
       ['cta', 'Start your project', 'Quote calculator call to action', '{}'],
-    ].forEach((s, i) => insertSection.run(s[0], s[1], s[2], s[3], i, 1));
+    ];
+    for (const [i, s] of sections.entries()) {
+      await conn.query(sectionSql, [s[0], s[1], s[2], s[3], i, 1]);
+    }
 
     /* ---------------- Settings ---------------- */
-    const insertSetting = db.prepare(
-      `INSERT INTO settings (key, value, "group") VALUES (?, ?, ?)`,
-    );
-    ([
+    const settingSql = `INSERT INTO settings (\`key\`, value, \`group\`) VALUES (?, ?, ?)`;
+    const settingDefaults: Array<[string, string, string]> = [
       ['site_theme', 'dark', 'appearance'],
       ['site_logo_url', '', 'appearance'],
       ['site_favicon_url', '', 'appearance'],
@@ -859,64 +823,72 @@ export function seedIfEmpty(db: Database.Database) {
       ['seo_description', 'Professional 3D printing, 3D design, rapid prototyping and model making in Bhubaneswar, Odisha.', 'seo'],
       ['session_timeout_minutes', '60', 'security'],
       ['remember_me_days', '30', 'security'],
-    ] as Array<[string, string, string]>).forEach((s) => insertSetting.run(s[0], s[1], s[2]));
+    ];
+    for (const s of settingDefaults) {
+      await conn.query(settingSql, s);
+    }
 
     /* ---------------- Reviews ---------------- */
-    const insertReview = db.prepare(
-      `INSERT INTO reviews (product_id, author_name, rating, title, body, is_approved)
-       VALUES (?, ?, ?, ?, ?, 1)`,
-    );
-    [
+    const reviewSql = `INSERT INTO reviews (product_id, author_name, rating, title, body, is_approved)
+       VALUES (?, ?, ?, ?, ?, 1)`;
+    const reviews: Array<[number, string, number, string, string]> = [
       [0, 'Subrat M.', 5, 'Better than the photos', 'The patina work is what sells it. Photos do not capture the depth.'],
       [0, 'Jyoti P.', 5, 'Gifted to my father', 'He has put it in the puja room. Highest compliment available.'],
       [1, 'Ritesh & Anu', 5, 'Wedding gift, perfect', 'The render approval step meant no surprises. Faces are genuinely recognisable.'],
       [2, 'Manoj K.', 4, 'Lovely light, cable a bit short', 'The shadows are gorgeous. I would have liked a longer cable for my setup.'],
       [3, 'Ashutosh R.', 5, 'Turns freely off the plate', 'Did not believe it until I held it. No assembly at all.'],
       [4, 'Sneha D.', 5, 'Next day, as promised', 'Uploaded at 11am, collected the following afternoon.'],
-    ].forEach((r) =>
-      insertReview.run(productIds[r[0] as number], r[1], r[2], r[3], r[4]),
-    );
+    ];
+    for (const r of reviews) {
+      await conn.query(reviewSql, [productIds[r[0]], r[1], r[2], r[3], r[4]]);
+    }
 
     /* ---------------- Notifications & activity ---------------- */
-    const insertNotif = db.prepare(
-      `INSERT INTO notifications (user_id, title, body, type, href, is_read, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, datetime('now', ?))`,
-    );
     // Nothing here may reference an order or a quote — none are seeded, so a
     // notification about one would link to a record that does not exist.
-    [
+    const notifSql = `INSERT INTO notifications (user_id, title, body, type, href, is_read, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`;
+    const notifications: Array<[number, string, string, string, string, number, string]> = [
       [adminId, 'Welcome to your control room', 'Products, colours and content are ready to edit. Orders and quotes will appear here as customers place them.', 'success', '/admin/products', 0, '-2 minutes'],
       [adminId, 'Set your studio rates', 'Check the quote calculator rates under Settings before sharing the instant-quote link.', 'warning', '/admin/settings', 0, '-1 minutes'],
-    ].forEach((n) => insertNotif.run(...n));
+    ];
+    for (const n of notifications) {
+      await conn.query(notifSql, [...n.slice(0, 6), offsetDate(n[6])]);
+    }
 
-    const insertLog = db.prepare(
-      `INSERT INTO activity_logs (user_id, actor_name, action, entity_type, entity_id, detail, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, datetime('now', ?))`,
-    );
-    [
-      ['seeded catalogue', 'product', 'Installed the starter product catalogue', '-2 minutes'],
-      ['seeded settings', 'settings', 'Applied the default studio rates and site settings', '-2 minutes'],
-    ].forEach((l) => insertLog.run(adminId, 'DRS Administrator', l[0], l[1], null, l[2], l[3]));
+    const logSql = `INSERT INTO activity_logs (user_id, actor_name, action, entity_type, entity_id, detail, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`;
+    const logs: Array<[string, string, string]> = [
+      ['seeded catalogue', 'product', '-2 minutes'],
+      ['seeded settings', 'settings', '-2 minutes'],
+    ];
+    for (const l of logs) {
+      await conn.query(logSql, [adminId, 'DRS Administrator', l[0], l[1], null, 'Installed the starter product catalogue', offsetDate(l[2])]);
+    }
 
     /* ---------------- Page views (analytics chart data) ---------------- */
-    const insertView = db.prepare(
-      `INSERT INTO page_views (path, referrer, country, device, session_id, created_at)
-       VALUES (?, ?, 'IN', ?, ?, datetime('now', ?))`,
-    );
+    const viewSql = `INSERT INTO page_views (path, referrer, country, device, session_id, created_at)
+       VALUES (?, ?, 'IN', ?, ?, ?)`;
     const paths = ['/', '/products', '/quote', '/gallery', '/services', '/contact', '/blog'];
     for (let d = 29; d >= 0; d--) {
       const hits = 40 + Math.floor(rnd() * 90);
       for (let i = 0; i < hits; i++) {
-        insertView.run(
+        await conn.query(viewSql, [
           paths[Math.floor(rnd() * paths.length)],
           rnd() > 0.6 ? 'https://www.google.com/' : null,
           rnd() > 0.45 ? 'mobile' : 'desktop',
           `s${d}-${i}`,
-          `-${d} days`,
-        );
+          offsetDate(`-${d} days`),
+        ]);
       }
     }
-  })();
 
-  console.log('[drs] database seeded');
+    await conn.commit();
+    console.log('[drs] database seeded');
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 }

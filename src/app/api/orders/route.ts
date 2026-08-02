@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { clientIp, rateLimit } from '@/lib/auth/rate-limit';
 import { getCurrentUser } from '@/lib/auth/session';
-import { getDb, one } from '@/lib/db';
+import { all, getPool, one } from '@/lib/db';
 import { sendMail } from '@/lib/mailer';
 import { site } from '@/lib/site';
 
@@ -50,7 +50,6 @@ export async function POST(req: Request) {
   }
 
   const input = parsed.data;
-  const db = getDb();
   const user = await getCurrentUser();
 
   /* ---------- An account is required, from the first order ----------
@@ -71,10 +70,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const settings = Object.fromEntries(
-    (db.prepare(`SELECT key, value FROM settings`).all() as Array<{ key: string; value: string }>)
-      .map((r) => [r.key, r.value]),
-  );
+  const settingRows = await all<{ key: string; value: string }>(`SELECT \`key\`, value FROM settings`);
+  const settings = Object.fromEntries(settingRows.map((r) => [r.key, r.value]));
   const gstPercent = Number(settings.gst_percent) || 18;
   const freeDeliveryAbove = Number(settings.free_delivery_above) || 10000;
   const deliveryFee = Number(settings.shipping_standard_fee) || 250;
@@ -103,7 +100,7 @@ export async function POST(req: Request) {
   const priced: Priced[] = [];
 
   for (const item of input.items) {
-    const product = one<{
+    const product = await one<{
       id: number;
       name: string;
       sku: string;
@@ -129,7 +126,7 @@ export async function POST(req: Request) {
     let colorHex: string | null = null;
 
     if (item.colorId !== null) {
-      const color = one<{ name: string; hex: string; price_delta: number }>(
+      const color = await one<{ name: string; hex: string; price_delta: number }>(
         `SELECT c.name, c.hex, pc.price_delta
          FROM product_colors pc JOIN colors c ON c.id = pc.color_id
          WHERE pc.product_id = ? AND pc.color_id = ? AND c.is_active = 1`,
@@ -166,7 +163,7 @@ export async function POST(req: Request) {
   let appliedCoupon: string | null = null;
 
   if (input.couponCode) {
-    const coupon = one<{
+    const coupon = await one<{
       id: number; code: string; type: string; value: number;
       min_order: number; max_discount: number | null;
       usage_limit: number | null; used_count: number;
@@ -174,8 +171,8 @@ export async function POST(req: Request) {
       `SELECT id, code, type, value, min_order, max_discount, usage_limit, used_count
        FROM coupons
        WHERE code = ? AND is_active = 1
-         AND (starts_at IS NULL OR starts_at <= datetime('now'))
-         AND (expires_at IS NULL OR expires_at > datetime('now'))`,
+         AND (starts_at IS NULL OR starts_at <= NOW())
+         AND (expires_at IS NULL OR expires_at > NOW())`,
       [input.couponCode.toUpperCase()],
     );
 
@@ -216,59 +213,59 @@ export async function POST(req: Request) {
   /* ---------- Persist ---------- */
   const orderNumber = `DRS-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 90 + 10)}`;
 
-  const insertOrder = db.prepare(`
-    INSERT INTO orders (order_number, user_id, customer_name, customer_email, customer_phone,
-                        shipping_address, subtotal, discount, tax, shipping, total, coupon_code,
-                        status, payment_status, payment_method, notes, placed_via,
-                        gift_wrap, gift_wrap_fee, gift_note,
-                        delivery_lat, delivery_lng, delivery_landmark, shipping_method)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', NULL, ?, 'website',
-            ?, ?, ?, ?, ?, ?, ?)
-  `);
-  const bumpLoyalty = db.prepare(
-    `UPDATE users SET loyalty_points = loyalty_points + ? WHERE id = ?`,
-  );
-  const insertItem = db.prepare(`
-    INSERT INTO order_items (order_id, product_id, product_name, sku, quantity, unit_price, total,
-                             color_name, color_hex)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  const bumpCoupon = db.prepare(`UPDATE coupons SET used_count = used_count + 1 WHERE code = ?`);
+  const conn = await getPool().getConnection();
+  let orderId: number;
+  try {
+    await conn.beginTransaction();
 
-  const orderId = db.transaction(() => {
-    const result = insertOrder.run(
-      orderNumber, user.id,
-      input.customerName, input.customerEmail, input.customerPhone,
-      input.address, subtotal, discount, tax, shipping, total,
-      appliedCoupon, input.notes || null,
-      giftWrap ? 1 : 0, wrapFee, giftWrap ? (input.giftNote || null) : null,
-      input.deliveryLat ?? null, input.deliveryLng ?? null,
-      input.deliveryLandmark || null, shippingMethod,
+    const [result] = await conn.query<import('mysql2').ResultSetHeader>(
+      `INSERT INTO orders (order_number, user_id, customer_name, customer_email, customer_phone,
+                          shipping_address, subtotal, discount, tax, shipping, total, coupon_code,
+                          status, payment_status, payment_method, notes, placed_via,
+                          gift_wrap, gift_wrap_fee, gift_note,
+                          delivery_lat, delivery_lng, delivery_landmark, shipping_method)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', NULL, ?, 'website',
+              ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        orderNumber, user.id,
+        input.customerName, input.customerEmail, input.customerPhone,
+        input.address, subtotal, discount, tax, shipping, total,
+        appliedCoupon, input.notes || null,
+        giftWrap ? 1 : 0, wrapFee, giftWrap ? (input.giftNote || null) : null,
+        input.deliveryLat ?? null, input.deliveryLng ?? null,
+        input.deliveryLandmark || null, shippingMethod,
+      ],
     );
-    const id = Number(result.lastInsertRowid);
+    orderId = result.insertId;
 
     for (const line of priced) {
-      insertItem.run(
-        id, line.productId, line.name, line.sku,
-        line.quantity, line.unitPrice, line.total,
-        line.colorName, line.colorHex,
+      await conn.query(
+        `INSERT INTO order_items (order_id, product_id, product_name, sku, quantity, unit_price, total,
+                                 color_name, color_hex)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [orderId, line.productId, line.name, line.sku, line.quantity, line.unitPrice, line.total, line.colorName, line.colorHex],
       );
     }
-    if (appliedCoupon) bumpCoupon.run(appliedCoupon);
+    if (appliedCoupon) {
+      await conn.query(`UPDATE coupons SET used_count = used_count + 1 WHERE code = ?`, [appliedCoupon]);
+    }
 
     // 1 loyalty point per ₹100 of the order total — awarded on placement,
     // same as every "earn on purchase" scheme; nothing to redeem against yet.
-    bumpLoyalty.run(Math.floor(total / 100), user.id);
+    await conn.query(`UPDATE users SET loyalty_points = loyalty_points + ? WHERE id = ?`, [Math.floor(total / 100), user.id]);
 
-    db.prepare(
+    await conn.query(
       `INSERT INTO notifications (title, body, type, href) VALUES (?, ?, 'order', '/admin/orders')`,
-    ).run(
-      `New order ${orderNumber}`,
-      `${input.customerName} — ${priced.length} item(s), ₹${total.toFixed(0)}`,
+      [`New order ${orderNumber}`, `${input.customerName} — ${priced.length} item(s), ₹${total.toFixed(0)}`],
     );
 
-    return id;
-  })();
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 
   await sendMail({
     to: site.contact.email,

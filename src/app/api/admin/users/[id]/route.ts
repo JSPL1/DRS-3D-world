@@ -28,7 +28,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: 'Invalid role.' }, { status: 400 });
   }
 
-  const target = one<{ id: number; name: string; role: string }>(
+  const target = await one<{ id: number; name: string; role: string }>(
     `SELECT id, name, role FROM users WHERE id = ?`,
     [id],
   );
@@ -39,7 +39,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // A studio with zero administrators is locked out of its own panel with no
   // way back in — the same guard already applied to suspending an admin.
   if (target.role === 'admin' && parsed.data.role !== 'admin') {
-    const otherAdmins = one<{ c: number }>(
+    const otherAdmins = await one<{ c: number }>(
       `SELECT COUNT(*) AS c FROM users WHERE role = 'admin' AND id != ?`,
       [id],
     );
@@ -48,9 +48,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
   }
 
-  run(`UPDATE users SET role = ?, token_version = token_version + 1 WHERE id = ?`, [parsed.data.role, id]);
+  await run(`UPDATE users SET role = ?, token_version = token_version + 1 WHERE id = ?`, [parsed.data.role, id]);
 
-  logActivity(user.id, user.name, 'changed role', 'user', id, `${target.name}: ${target.role} → ${parsed.data.role}`);
+  await logActivity(user.id, user.name, 'changed role', 'user', id, `${target.name}: ${target.role} → ${parsed.data.role}`);
 
   return NextResponse.json({ ok: true });
 }
@@ -73,7 +73,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     return NextResponse.json({ error: 'You cannot delete your own account.' }, { status: 400 });
   }
 
-  const target = one<{ id: number; name: string; email: string; role: string }>(
+  const target = await one<{ id: number; name: string; email: string; role: string }>(
     `SELECT id, name, email, role FROM users WHERE id = ?`,
     [id],
   );
@@ -82,7 +82,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   }
 
   if (target.role === 'admin') {
-    const otherAdmins = one<{ c: number }>(
+    const otherAdmins = await one<{ c: number }>(
       `SELECT COUNT(*) AS c FROM users WHERE role = 'admin' AND id != ?`,
       [id],
     );
@@ -91,9 +91,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     }
   }
 
-  run(`DELETE FROM users WHERE id = ?`, [id]);
+  await run(`DELETE FROM users WHERE id = ?`, [id]);
 
-  logActivity(user.id, user.name, 'deleted user', 'user', id, `${target.name} <${target.email}>`);
+  await logActivity(user.id, user.name, 'deleted user', 'user', id, `${target.name} <${target.email}>`);
 
   return NextResponse.json({ ok: true });
 }

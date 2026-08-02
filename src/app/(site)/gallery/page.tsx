@@ -23,8 +23,8 @@ export default async function GalleryPage({
   searchParams: Promise<{ category?: string }>;
 }) {
   const { category } = await searchParams;
-  const items = getGalleryItems(60, category);
-  const categories = getGalleryCategories();
+  const items = await getGalleryItems(60, category);
+  const categories = await getGalleryCategories();
 
   return (
     <div className="pb-24 pt-36">

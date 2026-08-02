@@ -8,7 +8,7 @@ export const metadata = { title: 'Gallery' };
 export default async function AdminGalleryPage() {
   await requirePermission('gallery.edit');
 
-  const items = all<{
+  const items = await all<{
     id: number;
     title: string | null;
     url: string;

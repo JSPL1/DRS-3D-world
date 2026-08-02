@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 
   const { id, decision, note } = parsed.data;
 
-  const product = one<{ name: string; slug: string; created_by: number | null }>(
+  const product = await one<{ name: string; slug: string; created_by: number | null }>(
     `SELECT name, slug, created_by FROM products WHERE id = ?`,
     [id],
   );
@@ -41,13 +41,13 @@ export async function POST(req: Request) {
 
   const approved = decision === 'approve';
 
-  run(
+  await run(
     `UPDATE products
        SET approval_status = ?,
            approved_by_name = ?,
            approved_at = ?,
            review_note = ?,
-           updated_at = datetime('now')
+           updated_at = NOW()
      WHERE id = ?`,
     [
       approved ? 'approved' : 'rejected',
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
   // Tell whoever entered it. Without this, "rejected" is a state only the
   // administrator can see and nothing ever gets corrected.
   if (product.created_by) {
-    run(
+    await run(
       `INSERT INTO notifications (user_id, title, body, type, href) VALUES (?, ?, ?, ?, ?)`,
       [
         product.created_by,
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
     );
   }
 
-  logActivity(
+  await logActivity(
     user.id, user.name,
     approved ? 'approved product' : 'rejected product',
     'product', id, product.name,

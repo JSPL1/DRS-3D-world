@@ -16,14 +16,14 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: 'Invalid user.' }, { status: 400 });
   }
 
-  const target = one<{ id: number; name: string }>(`SELECT id, name FROM users WHERE id = ?`, [id]);
+  const target = await one<{ id: number; name: string }>(`SELECT id, name FROM users WHERE id = ?`, [id]);
   if (!target) {
     return NextResponse.json({ error: 'That account no longer exists.' }, { status: 404 });
   }
 
-  run(`UPDATE users SET token_version = token_version + 1 WHERE id = ?`, [id]);
+  await run(`UPDATE users SET token_version = token_version + 1 WHERE id = ?`, [id]);
 
-  logActivity(user.id, user.name, 'signed out everywhere for', 'user', id, target.name);
+  await logActivity(user.id, user.name, 'signed out everywhere for', 'user', id, target.name);
 
   return NextResponse.json({ ok: true });
 }

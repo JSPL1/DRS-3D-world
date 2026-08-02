@@ -7,7 +7,7 @@ export const metadata = { title: 'Categories' };
 
 export default async function AdminCategoriesPage() {
   await requirePermission('categories.edit');
-  const categories = listAdminCategories();
+  const categories = await listAdminCategories();
 
   return (
     <>

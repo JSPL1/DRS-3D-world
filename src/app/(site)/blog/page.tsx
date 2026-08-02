@@ -17,8 +17,8 @@ export const metadata: Metadata = {
 // change effectively never reach visitors.
 export const dynamic = 'force-dynamic';
 
-export default function BlogPage() {
-  const posts = getBlogPosts(24);
+export default async function BlogPage() {
+  const posts = await getBlogPosts(24);
   const [lead, ...rest] = posts;
 
   return (

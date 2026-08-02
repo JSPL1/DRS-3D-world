@@ -28,13 +28,13 @@ export async function POST(req: Request) {
   }
   const g = parsed.data;
 
-  const result = run(
+  const result = await run(
     `INSERT INTO gallery_items (title, caption, url, thumb_url, media_type, category, is_active, sort_order)
      VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM gallery_items))`,
     [g.title || null, g.caption || null, g.url, g.url, g.mediaType, g.category || null, g.isActive ? 1 : 0],
   );
 
-  logActivity(user.id, user.name, 'added gallery item', 'gallery_item', Number(result.lastInsertRowid), g.title || g.url);
+  await logActivity(user.id, user.name, 'added gallery item', 'gallery_item', Number(result.lastInsertRowid), g.title || g.url);
   revalidatePath('/gallery');
   revalidatePath('/admin/gallery');
 
@@ -54,7 +54,7 @@ export async function PATCH(req: Request) {
   }
   const g = parsed.data;
 
-  const result = run(
+  const result = await run(
     `UPDATE gallery_items SET title = ?, caption = ?, url = ?, thumb_url = ?, media_type = ?, category = ?, is_active = ?
      WHERE id = ?`,
     [g.title || null, g.caption || null, g.url, g.url, g.mediaType, g.category || null, g.isActive ? 1 : 0, g.id],
@@ -64,7 +64,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Item not found.' }, { status: 404 });
   }
 
-  logActivity(user.id, user.name, 'updated gallery item', 'gallery_item', g.id, g.title || g.url);
+  await logActivity(user.id, user.name, 'updated gallery item', 'gallery_item', g.id, g.title || g.url);
   revalidatePath('/gallery');
   revalidatePath('/admin/gallery');
 
@@ -80,11 +80,11 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Invalid id.' }, { status: 400 });
   }
 
-  const existing = one<{ title: string | null }>(`SELECT title FROM gallery_items WHERE id = ?`, [id]);
+  const existing = await one<{ title: string | null }>(`SELECT title FROM gallery_items WHERE id = ?`, [id]);
   if (!existing) return NextResponse.json({ error: 'Item not found.' }, { status: 404 });
 
-  run(`DELETE FROM gallery_items WHERE id = ?`, [id]);
-  logActivity(user.id, user.name, 'deleted gallery item', 'gallery_item', id, existing.title ?? `#${id}`);
+  await run(`DELETE FROM gallery_items WHERE id = ?`, [id]);
+  await logActivity(user.id, user.name, 'deleted gallery item', 'gallery_item', id, existing.title ?? `#${id}`);
   revalidatePath('/gallery');
   revalidatePath('/admin/gallery');
 

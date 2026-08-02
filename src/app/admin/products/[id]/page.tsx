@@ -69,13 +69,13 @@ export default async function EditProductPage({
   const productId = Number(id);
   if (!Number.isInteger(productId)) notFound();
 
-  const row = one<Row>(`SELECT * FROM products WHERE id = ?`, [productId]);
+  const row = await one<Row>(`SELECT * FROM products WHERE id = ?`, [productId]);
   if (!row) notFound();
 
-  const categories = all<{ id: number; name: string }>(
+  const categories = await all<{ id: number; name: string }>(
     `SELECT id, name FROM categories WHERE is_active = 1 ORDER BY sort_order`,
   );
-  const brands = all<{ id: number; name: string }>(
+  const brands = await all<{ id: number; name: string }>(
     `SELECT id, name FROM brands WHERE is_active = 1 ORDER BY name`,
   );
 
@@ -118,14 +118,14 @@ export default async function EditProductPage({
     metaKeywords: row.meta_keywords ?? '',
   };
 
-  const gallery = all<GalleryImage>(
+  const gallery = await all<GalleryImage>(
     `SELECT id, url, alt FROM product_images
      WHERE product_id = ? AND kind = 'gallery' ORDER BY sort_order, id`,
     [row.id],
   );
 
-  const palette = getColorPalette().filter((c) => c.is_active === 1);
-  const assigned = getProductColors(row.id).map((c) => ({
+  const palette = (await getColorPalette()).filter((c) => c.is_active === 1);
+  const assigned = (await getProductColors(row.id)).map((c) => ({
     colorId: c.id,
     imageUrl: c.imageUrl,
     priceDelta: c.priceDelta,

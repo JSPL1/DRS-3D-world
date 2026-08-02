@@ -8,7 +8,7 @@ export const metadata = { title: 'Videos' };
 export default async function AdminVideosPage() {
   await requirePermission('videos.edit');
 
-  const videos = all<{
+  const videos = await all<{
     id: number;
     title: string;
     description: string | null;

@@ -34,9 +34,9 @@ export async function POST(req: Request) {
   const { ticket, password } = parsed.data;
   const tokenHash = createHash('sha256').update(ticket).digest('hex');
 
-  const record = one<{ id: number; user_id: number }>(
+  const record = await one<{ id: number; user_id: number }>(
     `SELECT id, user_id FROM reset_tickets
-     WHERE token_hash = ? AND used_at IS NULL AND expires_at > datetime('now')`,
+     WHERE token_hash = ? AND used_at IS NULL AND expires_at > NOW()`,
     [tokenHash],
   );
   if (!record) {
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const user = one<{ id: number; name: string }>(`SELECT id, name FROM users WHERE id = ?`, [
+  const user = await one<{ id: number; name: string }>(`SELECT id, name FROM users WHERE id = ?`, [
     record.user_id,
   ]);
   if (!user) {
@@ -55,15 +55,15 @@ export async function POST(req: Request) {
 
   // Bumping token_version signs out every existing session on this account —
   // the point of a password reset.
-  run(
+  await run(
     `UPDATE users
-     SET password_hash = ?, token_version = token_version + 1, updated_at = datetime('now')
+     SET password_hash = ?, token_version = token_version + 1, updated_at = NOW()
      WHERE id = ?`,
     [bcrypt.hashSync(password, 10), user.id],
   );
-  run(`UPDATE reset_tickets SET used_at = datetime('now') WHERE id = ?`, [record.id]);
+  await run(`UPDATE reset_tickets SET used_at = NOW() WHERE id = ?`, [record.id]);
 
-  logActivity(user.id, user.name, 'reset password', 'user', user.id, `Reset from ${ip}`);
+  await logActivity(user.id, user.name, 'reset password', 'user', user.id, `Reset from ${ip}`);
 
   return NextResponse.json({ ok: true, message: 'Password updated. You can sign in now.' });
 }

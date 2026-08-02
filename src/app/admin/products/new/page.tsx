@@ -10,10 +10,10 @@ export const metadata = { title: 'New product' };
 export default async function NewProductPage() {
   const user = await requirePermission('products.edit');
 
-  const categories = all<{ id: number; name: string }>(
+  const categories = await all<{ id: number; name: string }>(
     `SELECT id, name FROM categories WHERE is_active = 1 ORDER BY sort_order`,
   );
-  const brands = all<{ id: number; name: string }>(
+  const brands = await all<{ id: number; name: string }>(
     `SELECT id, name FROM brands WHERE is_active = 1 ORDER BY name`,
   );
 

@@ -11,7 +11,7 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ productIds: [] });
 
-  const rows = all<{ product_id: number }>(
+  const rows = await all<{ product_id: number }>(
     `SELECT product_id FROM wishlists WHERE user_id = ?`,
     [user.id],
   );
@@ -39,19 +39,19 @@ export async function POST(req: Request) {
 
   const { productId } = parsed.data;
 
-  const product = one<{ id: number }>(`SELECT id FROM products WHERE id = ?`, [productId]);
+  const product = await one<{ id: number }>(`SELECT id FROM products WHERE id = ?`, [productId]);
   if (!product) return NextResponse.json({ error: 'Product not found.' }, { status: 404 });
 
-  const existing = one<{ id: number }>(
+  const existing = await one<{ id: number }>(
     `SELECT id FROM wishlists WHERE user_id = ? AND product_id = ?`,
     [user.id, productId],
   );
 
   if (existing) {
-    run(`DELETE FROM wishlists WHERE id = ?`, [existing.id]);
+    await run(`DELETE FROM wishlists WHERE id = ?`, [existing.id]);
     return NextResponse.json({ ok: true, wishlisted: false });
   }
 
-  run(`INSERT INTO wishlists (user_id, product_id) VALUES (?, ?)`, [user.id, productId]);
+  await run(`INSERT INTO wishlists (user_id, product_id) VALUES (?, ?)`, [user.id, productId]);
   return NextResponse.json({ ok: true, wishlisted: true });
 }

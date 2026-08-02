@@ -43,26 +43,25 @@ export async function POST(req: Request) {
     phone = normalisePhone(parsed.data.phone);
   }
 
-  const existing = one<{ id: number }>(`SELECT id FROM users WHERE email = ?`, [email]);
+  const existing = await one<{ id: number }>(`SELECT id FROM users WHERE email = ?`, [email]);
   if (existing) {
     return NextResponse.json({ error: 'An account already exists with that email.' }, { status: 409 });
   }
   if (phone) {
-    const phoneTaken = one<{ id: number }>(`SELECT id FROM users WHERE phone = ?`, [phone]);
+    const phoneTaken = await one<{ id: number }>(`SELECT id FROM users WHERE phone = ?`, [phone]);
     if (phoneTaken) {
       return NextResponse.json({ error: 'That mobile number is already in use.' }, { status: 409 });
     }
   }
 
-  const id = Number(
-    run(
-      `INSERT INTO users (name, email, phone, password_hash, role, status, email_verified_at)
-       VALUES (?, ?, ?, ?, ?, 'active', datetime('now'))`,
-      [name, email, phone, bcrypt.hashSync(password, 10), role],
-    ).lastInsertRowid,
+  const { lastInsertRowid } = await run(
+    `INSERT INTO users (name, email, phone, password_hash, role, status, email_verified_at)
+     VALUES (?, ?, ?, ?, ?, 'active', NOW())`,
+    [name, email, phone, bcrypt.hashSync(password, 10), role],
   );
+  const id = Number(lastInsertRowid);
 
-  logActivity(user.id, user.name, 'created user', 'user', id, `${name} <${email}> as ${role}`);
+  await logActivity(user.id, user.name, 'created user', 'user', id, `${name} <${email}> as ${role}`);
 
   return NextResponse.json({ ok: true, id });
 }

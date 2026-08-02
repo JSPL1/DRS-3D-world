@@ -11,8 +11,8 @@ import { getCategories } from '@/lib/queries';
 import { site } from '@/lib/site';
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
-  const branding = getBranding();
-  const categories = getCategories();
+  const branding = await getBranding();
+  const categories = await getCategories();
 
   // Resolved on the server so the header is correct in the first response —
   // reading it on the client would flash "Sign in" at someone who is signed

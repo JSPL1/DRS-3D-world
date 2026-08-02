@@ -40,7 +40,7 @@ export default async function AdminProductsPage({
   const user = await requirePermission('products.view');
   const { q } = await searchParams;
 
-  const products = listAdminProducts(q);
+  const products = await listAdminProducts(q);
   const editable = can(user.role, 'products.edit');
   const deletable = can(user.role, 'products.delete');
 

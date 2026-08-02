@@ -31,20 +31,20 @@ export async function POST(req: Request) {
   const { email, code } = parsed.data;
   const invalid = { error: 'That code is not valid or has expired.' };
 
-  const user = one<{ id: number }>(`SELECT id FROM users WHERE email = ?`, [email]);
+  const user = await one<{ id: number }>(`SELECT id FROM users WHERE email = ?`, [email]);
   if (!user) return NextResponse.json(invalid, { status: 400 });
 
-  const otp = one<{ id: number; code_hash: string; attempts: number }>(
+  const otp = await one<{ id: number; code_hash: string; attempts: number }>(
     `SELECT id, code_hash, attempts FROM otp_codes
      WHERE user_id = ? AND purpose = 'password_reset'
-       AND consumed_at IS NULL AND expires_at > datetime('now')
+       AND consumed_at IS NULL AND expires_at > NOW()
      ORDER BY id DESC LIMIT 1`,
     [user.id],
   );
   if (!otp) return NextResponse.json(invalid, { status: 400 });
 
   if (otp.attempts >= MAX_ATTEMPTS) {
-    run(`UPDATE otp_codes SET consumed_at = datetime('now') WHERE id = ?`, [otp.id]);
+    await run(`UPDATE otp_codes SET consumed_at = NOW() WHERE id = ?`, [otp.id]);
     return NextResponse.json(
       { error: 'Too many incorrect attempts. Please request a new code.' },
       { status: 400 },
@@ -52,22 +52,22 @@ export async function POST(req: Request) {
   }
 
   if (!bcrypt.compareSync(code, otp.code_hash)) {
-    run(`UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ?`, [otp.id]);
+    await run(`UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ?`, [otp.id]);
     return NextResponse.json(
       { error: `That code is not correct. ${MAX_ATTEMPTS - otp.attempts - 1} attempts remaining.` },
       { status: 400 },
     );
   }
 
-  run(`UPDATE otp_codes SET consumed_at = datetime('now') WHERE id = ?`, [otp.id]);
+  await run(`UPDATE otp_codes SET consumed_at = NOW() WHERE id = ?`, [otp.id]);
 
   // Issue a single-use ticket; only the hash is stored, so a database read
   // alone can't be replayed against the reset endpoint.
   const ticket = randomBytes(32).toString('hex');
-  run(
+  await run(
     `INSERT INTO reset_tickets (user_id, token_hash, expires_at)
-     VALUES (?, ?, datetime('now', ?))`,
-    [user.id, createHash('sha256').update(ticket).digest('hex'), `+${TICKET_TTL_MINUTES} minutes`],
+     VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE))`,
+    [user.id, createHash('sha256').update(ticket).digest('hex'), TICKET_TTL_MINUTES],
   );
 
   return NextResponse.json({ ok: true, ticket, expiresInMinutes: TICKET_TTL_MINUTES });

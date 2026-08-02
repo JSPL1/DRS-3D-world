@@ -8,8 +8,8 @@ export const metadata = { title: 'Reviews' };
 
 export default async function AdminReviewsPage() {
   await requirePermission('reviews.moderate');
-  const reviews = listAdminReviews();
-  const products = all<{ id: number; name: string }>(
+  const reviews = await listAdminReviews();
+  const products = await all<{ id: number; name: string }>(
     `SELECT id, name FROM products ORDER BY name`,
   );
 

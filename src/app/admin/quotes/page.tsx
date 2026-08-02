@@ -13,7 +13,7 @@ const QUOTE_STATUSES = ['new', 'reviewed', 'sent', 'accepted', 'rejected'] as co
 export default async function AdminQuotesPage() {
   const user = await requirePermission('quotes.view');
 
-  const quotes = listAdminQuotes();
+  const quotes = await listAdminQuotes();
   const editable = can(user.role, 'quotes.edit');
 
   const pipeline = quotes

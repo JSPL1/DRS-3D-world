@@ -227,7 +227,7 @@ const SECRET_PLACEHOLDER = '••••••••••••';
 
 export default async function AdminSettingsPage() {
   await requirePermission('settings.edit');
-  const stored = getSettings();
+  const stored = await getSettings();
 
   const settings = { ...stored };
   for (const key of SECRET_KEYS) {

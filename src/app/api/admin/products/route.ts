@@ -54,12 +54,12 @@ const productSchema = z.object({
 });
 
 /** Ensures the generated slug doesn't collide with another product. */
-function uniqueSlug(base: string, excludeId?: number): string {
+async function uniqueSlug(base: string, excludeId?: number): Promise<string> {
   let slug = base || 'product';
   let n = 1;
 
   for (;;) {
-    const clash = one<{ id: number }>(`SELECT id FROM products WHERE slug = ?`, [slug]);
+    const clash = await one<{ id: number }>(`SELECT id FROM products WHERE slug = ?`, [slug]);
     if (!clash || clash.id === excludeId) return slug;
     n += 1;
     slug = `${base}-${n}`;
@@ -158,14 +158,14 @@ export async function POST(req: Request) {
     );
   }
 
-  const slug = uniqueSlug(slugify(parsed.data.name));
-  const sku = nextSku();
+  const slug = await uniqueSlug(slugify(parsed.data.name));
+  const sku = await nextSku();
   const approval = approvalFor(user.role, user.name);
 
   const insertColumns = [
     ...COLUMNS, ...APPROVAL_COLUMNS, 'created_by', 'created_by_name', 'updated_by_name',
   ];
-  const params = {
+  const params: Record<string, unknown> = {
     ...toParams(parsed.data, slug, sku),
     ...approval,
     created_by: user.id,
@@ -173,18 +173,18 @@ export async function POST(req: Request) {
     updated_by_name: user.name,
   };
 
-  const result = run(
+  const result = await run(
     `INSERT INTO products (${insertColumns.join(', ')})
-     VALUES (${insertColumns.map((c) => `@${c}`).join(', ')})`,
-    [params as never],
+     VALUES (${insertColumns.map(() => '?').join(', ')})`,
+    insertColumns.map((c) => params[c]),
   );
   const id = Number(result.lastInsertRowid);
 
-  logActivity(user.id, user.name, 'created product', 'product', id, `${parsed.data.name} (${sku})`);
+  await logActivity(user.id, user.name, 'created product', 'product', id, `${parsed.data.name} (${sku})`);
 
   // An administrator has to know there is something waiting for them.
   if (approval.approval_status === 'pending') {
-    run(
+    await run(
       `INSERT INTO notifications (title, body, type, href)
        VALUES (?, ?, 'warning', ?)`,
       [
@@ -219,7 +219,7 @@ export async function PATCH(req: Request) {
   }
 
   const id = parsed.data.id;
-  const current = one<{ slug: string; sku: string; approval_status: string }>(
+  const current = await one<{ slug: string; sku: string; approval_status: string }>(
     `SELECT slug, sku, approval_status FROM products WHERE id = ?`,
     [id],
   );
@@ -227,9 +227,9 @@ export async function PATCH(req: Request) {
 
   // A product issued before codes were automatic keeps the code it was sold
   // under; only ones with no code at all are given one.
-  const sku = current.sku?.trim() || nextSku();
+  const sku = current.sku?.trim() || (await nextSku());
 
-  const slug = uniqueSlug(slugify(parsed.data.name), id);
+  const slug = await uniqueSlug(slugify(parsed.data.name), id);
 
   // Editing an approved product sends it back for approval, unless the person
   // editing can approve. Otherwise sign-off would only ever cover the first
@@ -237,24 +237,23 @@ export async function PATCH(req: Request) {
   const approval = approvalFor(user.role, user.name);
 
   const updateColumns = [...COLUMNS, ...APPROVAL_COLUMNS, 'updated_by_name'];
-  const params = {
+  const params: Record<string, unknown> = {
     ...toParams(parsed.data, slug, sku),
     ...approval,
     updated_by_name: user.name,
-    id,
   };
 
-  run(
-    `UPDATE products SET ${updateColumns.map((c) => `${c} = @${c}`).join(', ')},
-       updated_at = datetime('now')
-     WHERE id = @id`,
-    [params as never],
+  await run(
+    `UPDATE products SET ${updateColumns.map((c) => `${c} = ?`).join(', ')},
+       updated_at = NOW()
+     WHERE id = ?`,
+    [...updateColumns.map((c) => params[c]), id],
   );
 
-  logActivity(user.id, user.name, 'updated product', 'product', id, parsed.data.name);
+  await logActivity(user.id, user.name, 'updated product', 'product', id, parsed.data.name);
 
   if (approval.approval_status === 'pending' && current.approval_status !== 'pending') {
-    run(
+    await run(
       `INSERT INTO notifications (title, body, type, href)
        VALUES (?, ?, 'warning', ?)`,
       [
@@ -280,15 +279,15 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Invalid product id.' }, { status: 400 });
   }
 
-  const product = one<{ name: string; slug: string }>(
+  const product = await one<{ name: string; slug: string }>(
     `SELECT name, slug FROM products WHERE id = ?`,
     [id],
   );
   if (!product) return NextResponse.json({ error: 'Product not found.' }, { status: 404 });
 
-  run(`DELETE FROM products WHERE id = ?`, [id]);
+  await run(`DELETE FROM products WHERE id = ?`, [id]);
 
-  logActivity(user.id, user.name, 'deleted product', 'product', id, product.name);
+  await logActivity(user.id, user.name, 'deleted product', 'product', id, product.name);
   revalidateProduct(product.slug);
 
   return NextResponse.json({ ok: true });

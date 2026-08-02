@@ -37,12 +37,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'A percentage discount cannot exceed 100.' }, { status: 400 });
   }
 
-  const existing = one<{ id: number }>(`SELECT id FROM coupons WHERE code = ?`, [c.code]);
+  const existing = await one<{ id: number }>(`SELECT id FROM coupons WHERE code = ?`, [c.code]);
   if (existing) {
     return NextResponse.json({ error: `Code ${c.code} already exists.` }, { status: 409 });
   }
 
-  const result = run(
+  const result = await run(
     `INSERT INTO coupons (code, description, type, value, min_order, max_discount, usage_limit, starts_at, expires_at, is_active)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     ],
   );
 
-  logActivity(user.id, user.name, 'created coupon', 'coupon', Number(result.lastInsertRowid), c.code);
+  await logActivity(user.id, user.name, 'created coupon', 'coupon', Number(result.lastInsertRowid), c.code);
   revalidatePath('/admin/coupons');
 
   return NextResponse.json({ ok: true, id: Number(result.lastInsertRowid) });
@@ -75,12 +75,12 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'A percentage discount cannot exceed 100.' }, { status: 400 });
   }
 
-  const codeTaken = one<{ id: number }>(`SELECT id FROM coupons WHERE code = ? AND id != ?`, [c.code, c.id]);
+  const codeTaken = await one<{ id: number }>(`SELECT id FROM coupons WHERE code = ? AND id != ?`, [c.code, c.id]);
   if (codeTaken) {
     return NextResponse.json({ error: `Code ${c.code} is already used by another coupon.` }, { status: 409 });
   }
 
-  const result = run(
+  const result = await run(
     `UPDATE coupons
      SET code = ?, description = ?, type = ?, value = ?, min_order = ?, max_discount = ?,
          usage_limit = ?, starts_at = ?, expires_at = ?, is_active = ?
@@ -96,7 +96,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Coupon not found.' }, { status: 404 });
   }
 
-  logActivity(user.id, user.name, 'updated coupon', 'coupon', c.id, c.code);
+  await logActivity(user.id, user.name, 'updated coupon', 'coupon', c.id, c.code);
   revalidatePath('/admin/coupons');
 
   return NextResponse.json({ ok: true });
@@ -111,11 +111,11 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Invalid id.' }, { status: 400 });
   }
 
-  const existing = one<{ code: string }>(`SELECT code FROM coupons WHERE id = ?`, [id]);
+  const existing = await one<{ code: string }>(`SELECT code FROM coupons WHERE id = ?`, [id]);
   if (!existing) return NextResponse.json({ error: 'Coupon not found.' }, { status: 404 });
 
-  run(`DELETE FROM coupons WHERE id = ?`, [id]);
-  logActivity(user.id, user.name, 'deleted coupon', 'coupon', id, existing.code);
+  await run(`DELETE FROM coupons WHERE id = ?`, [id]);
+  await logActivity(user.id, user.name, 'deleted coupon', 'coupon', id, existing.code);
   revalidatePath('/admin/coupons');
 
   return NextResponse.json({ ok: true });

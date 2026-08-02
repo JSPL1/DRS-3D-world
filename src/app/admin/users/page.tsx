@@ -46,8 +46,8 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: S
   const roleFilter = str('role');
   const statusFilter = str('status');
 
-  const allUsers = listAdminUsers();
-  const users = listAdminUsers({ search: q, role: roleFilter, status: statusFilter });
+  const allUsers = await listAdminUsers();
+  const users = await listAdminUsers({ search: q, role: roleFilter, status: statusFilter });
 
   return (
     <>

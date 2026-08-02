@@ -8,14 +8,14 @@ export const metadata = { title: 'Testimonials' };
 export default async function AdminTestimonialsPage() {
   await requirePermission('testimonials.edit');
 
-  const testimonials = all<TestimonialRow>(
+  const testimonials = await all<TestimonialRow>(
     `SELECT id, author_name, author_role, company, avatar_url, quote, rating, is_featured, is_active
      FROM testimonials ORDER BY is_featured DESC, sort_order`,
   );
 
   // Registered customers, so a testimonial can reuse the photo already on
   // their account rather than the admin re-uploading it.
-  const customers = all<CustomerOption>(
+  const customers = await all<CustomerOption>(
     `SELECT id, name, email, avatar_url FROM users
      WHERE role = 'customer' AND status = 'active' ORDER BY name LIMIT 200`,
   );

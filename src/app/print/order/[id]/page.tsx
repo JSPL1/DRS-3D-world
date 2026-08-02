@@ -39,7 +39,7 @@ export default async function PrintOrderPage({
   const doc = query.doc === 'order' ? 'order' : 'challan';
   const size: ChallanSize = isChallanSize(query.size) ? query.size : doc === 'order' ? 'a4' : '4x6';
 
-  const order = one<PrintOrder & ChallanOrder>(
+  const order = await one<PrintOrder & ChallanOrder>(
     `SELECT order_number, customer_name, customer_email, customer_phone, shipping_address,
             delivery_landmark, subtotal, discount, tax, shipping, total, coupon_code,
             status, payment_status, shipping_method, gift_wrap, gift_wrap_fee, gift_note,
@@ -49,13 +49,13 @@ export default async function PrintOrderPage({
   );
   if (!order) notFound();
 
-  const items = all<PrintItem & ChallanItem>(
+  const items = await all<PrintItem & ChallanItem>(
     `SELECT product_name, sku, quantity, unit_price, total, color_name
      FROM order_items WHERE order_id = ? ORDER BY id`,
     [orderId],
   );
 
-  const settings = getSettings();
+  const settings = await getSettings();
   const company: ChallanCompany = {
     name: settings.site_name?.trim() || site.name,
     address: settings.address?.trim() || site.contact.address.line1,

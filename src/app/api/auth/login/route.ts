@@ -50,7 +50,7 @@ export async function POST(req: Request) {
   const key = byPhone ? normalisePhone(identifier) : identifier.toLowerCase();
 
   const user = key
-    ? one<{
+    ? await one<{
         id: number;
         name: string;
         email: string;
@@ -101,7 +101,7 @@ export async function POST(req: Request) {
   }
 
   await createSession(user, remember);
-  logActivity(user.id, user.name, 'logged in', 'user', user.id, `Signed in from ${ip}`);
+  await logActivity(user.id, user.name, 'logged in', 'user', user.id, `Signed in from ${ip}`);
 
   return NextResponse.json({
     ok: true,

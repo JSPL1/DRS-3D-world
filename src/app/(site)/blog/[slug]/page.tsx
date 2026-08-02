@@ -15,7 +15,8 @@ import { site } from '@/lib/site';
 export const dynamic = 'force-dynamic';
 
 export async function generateStaticParams() {
-  return getBlogPosts(100).map((p) => ({ slug: p.slug }));
+  const posts = await getBlogPosts(100);
+  return posts.map((p) => ({ slug: p.slug }));
 }
 
 export async function generateMetadata({
@@ -24,7 +25,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const post = getBlogPostBySlug(slug);
+  const post = await getBlogPostBySlug(slug);
   if (!post) return { title: 'Article not found' };
 
   return {
@@ -76,11 +77,11 @@ function renderBody(content: string) {
 
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const post = getBlogPostBySlug(slug);
+  const post = await getBlogPostBySlug(slug);
   if (!post) notFound();
 
   const tags = parseJson<string[]>(post.tags, []);
-  const more = getBlogPosts(4).filter((p) => p.slug !== post.slug).slice(0, 3);
+  const more = (await getBlogPosts(4)).filter((p) => p.slug !== post.slug).slice(0, 3);
 
   const jsonLd = {
     '@context': 'https://schema.org',
