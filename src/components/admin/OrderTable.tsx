@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus } from 'lucide-react';
+import { Plus, Printer, Truck } from 'lucide-react';
 import { Fragment, useState } from 'react';
 
 import { StatusSelect } from '@/components/admin/StatusSelect';
@@ -136,9 +136,32 @@ export function OrderTable({
                     {/* The running neon ring: on only while this order is
                         expanded, gone the moment it is closed. */}
                     <div className="neon-frame m-4 p-5">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-flame-500">
-                        Full order — {order.order_number}
-                      </p>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-flame-500">
+                          Full order — {order.order_number}
+                        </p>
+
+                        <div className="flex flex-wrap gap-2">
+                          <a
+                            href={`/print/order/${order.id}?doc=order`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-ink-700 px-3 text-[12px] font-medium text-ink-200 transition-colors hover:border-flame-500/50 hover:text-flame-500"
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                            Print order
+                          </a>
+                          <a
+                            href={`/print/order/${order.id}?doc=challan`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-flame-700 px-3 text-[12px] font-semibold text-white transition-colors hover:bg-flame-800"
+                          >
+                            <Truck className="h-3.5 w-3.5" />
+                            Delivery challan
+                          </a>
+                        </div>
+                      </div>
 
                       <div className="mt-3 overflow-hidden rounded-xl border border-ink-800">
                         <table className="w-full text-left text-[13px]">

@@ -334,6 +334,20 @@ html.lenis body {
   background-color: rgba(5, 5, 6, 0.35);
 }
 
+/* Printed documents — challans, order sheets. Always literal black on literal
+   white, whatever theme the admin happens to be using on screen.
+
+   This has to pin `--color-white` back to #ffffff: everywhere else in the app
+   that token means "primary ink on a filled surface", which resolves to
+   near-black in the light theme. Without this a print sheet using `bg-white`
+   renders black-on-black — which is exactly what it did before this rule. */
+.print-doc {
+  --color-white: #ffffff;
+  --color-black: #000000;
+  background: #ffffff;
+  color: #000000;
+}
+
 /* Admin sidebar: dark sidebar + light content is the mockup's fixed layout,
    not a themed surface — `bg-ink-900` would have flipped to near-white in
    light theme since ink-900 is relative to the page, not an absolute shade.

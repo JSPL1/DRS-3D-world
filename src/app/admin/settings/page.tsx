@@ -135,6 +135,11 @@ const GROUPS: SettingGroup[] = [
       { key: 'currency', label: 'Currency code' },
       { key: 'gst_percent', label: 'GST', type: 'number', suffix: '%' },
       { key: 'free_delivery_above', label: 'Free delivery above', type: 'number', suffix: '₹' },
+      {
+        key: 'company_gstin',
+        label: 'Company GSTIN',
+        hint: 'Printed on delivery challans and order print-outs. Leave blank and the GSTIN line is left off entirely.',
+      },
     ],
   },
   {
@@ -161,6 +166,11 @@ const GROUPS: SettingGroup[] = [
       { key: 'shipping_priority_fee', label: 'Priority fee', type: 'number', suffix: '₹' },
       { key: 'shipping_priority_days', label: 'Priority timeframe' },
       { key: 'gift_wrap_fee', label: 'Gift wrap fee', type: 'number', suffix: '₹' },
+      {
+        key: 'delivery_partner',
+        label: 'Delivery partner',
+        hint: 'Shown as the courier on printed delivery challans.',
+      },
     ],
   },
   {

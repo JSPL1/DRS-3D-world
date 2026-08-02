@@ -333,6 +333,12 @@ function ensureSettings(db: Database.Database) {
     // Gift wrap add-on fee, admin-configurable.
     ['gift_wrap_fee', '149', 'shipping'],
 
+    // Printed on the delivery challan and the order print-out. Blank until
+    // the studio fills it in — the challan then simply omits the GSTIN line
+    // rather than printing an empty label.
+    ['company_gstin', '', 'commerce'],
+    ['delivery_partner', 'DRS 3D WORLD Delivery', 'shipping'],
+
     // Dormant integrations — inert until the studio pastes in real
     // credentials, following the same pattern as SMTP above.
     ['oauth_google_client_id', '', 'integrations'],
