@@ -39,7 +39,10 @@ export function SplitHero() {
 
   return (
     <section className="relative z-10 bg-[var(--bg)] pt-10">
-      <div className="mx-auto max-w-[1320px] px-4 sm:px-6 lg:px-8">
+      {/* 1400px, matching the navbar and every other section. At 1320 this
+          block sat 80px narrower than the rest of the page and read as
+          misaligned against the header above it. */}
+      <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
         <div className="grid gap-4 lg:grid-cols-[1.28fr_.72fr]">
           {/* Headline + stats card */}
           <div className="relative overflow-hidden rounded-[28px] border border-ink-800 bg-[var(--surface)] p-9 sm:p-12">

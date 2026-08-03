@@ -220,7 +220,7 @@ const FADE = {
  */
 function StaticHero({ light }: { light: boolean }) {
   return (
-    <section className="relative flex h-dvh min-h-[560px] flex-col items-center justify-center overflow-hidden px-6 text-center">
+    <section className="relative flex flex-col items-center justify-center overflow-hidden px-6 py-16 text-center sm:py-20">
       <div
         aria-hidden
         className={
@@ -231,12 +231,12 @@ function StaticHero({ light }: { light: boolean }) {
       />
       <div
         aria-hidden
-        className={`absolute left-1/2 top-1/2 h-[80vh] w-[80vh] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[140px] ${
+        className={`absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px] ${
           light ? 'bg-flame-500/[0.10]' : 'bg-flame-500/[0.07]'
         }`}
       />
 
-      <span className="relative mb-6 inline-flex items-center gap-2 rounded-full border border-flame-500/30 bg-flame-500/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-flame-400">
+      <span className="relative mb-5 inline-flex items-center gap-2 rounded-full border border-flame-500/30 bg-flame-500/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-flame-400">
         <span className="relative flex h-1.5 w-1.5">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-flame-500" />
           <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-flame-500" />
@@ -244,16 +244,20 @@ function StaticHero({ light }: { light: boolean }) {
         Bhubaneswar · Odisha
       </span>
 
-      <h1 className="relative font-display text-[13vw] font-bold leading-[0.86] tracking-[-0.04em] sm:text-[10vw] lg:text-[8.5vw] xl:text-[7.5rem]">
+      {/* Compact by design. With the 3D printer switched off this is a plain
+          banner, not a full screen of type — the studio turns the animation
+          off to get a shorter homepage, so filling the viewport with a
+          headline instead defeats the point. */}
+      <h1 className="relative font-display text-[clamp(38px,7vw,68px)] font-bold leading-[0.9] tracking-[-0.04em]">
         <span className="block text-white">DRS 3D</span>
         <span className="block text-flame">WORLD</span>
       </h1>
 
-      <p className="relative mt-7 max-w-xl text-balance-pretty text-base leading-relaxed text-ink-200 sm:text-lg">
+      <p className="relative mt-5 max-w-xl text-balance-pretty text-[15px] leading-relaxed text-ink-200">
         {site.slogan}.
       </p>
 
-      <div className="relative pointer-events-auto mt-9 flex flex-col gap-3 sm:flex-row">
+      <div className="relative pointer-events-auto mt-7 flex flex-col gap-3 sm:flex-row">
         <ButtonLink href="/quote" size="lg">
           Get an instant quote
           <ArrowRight className="h-4 w-4" />
@@ -558,16 +562,20 @@ export function HeroExperience({
                   Bhubaneswar · Odisha
                 </span>
 
-                <h1 className="font-display text-[13vw] font-bold leading-[0.86] tracking-[-0.04em] sm:text-[10vw] lg:text-[8.5vw] xl:text-[7.5rem]">
+                {/* Capped at 88px rather than 7.5rem/13vw. The badge, headline,
+                    slogan, buttons and the scroll cue below all share one
+                    viewport height, and at the old size that stack ran past
+                    the bottom of the screen on a laptop or at browser zoom. */}
+                <h1 className="font-display text-[clamp(40px,8vw,88px)] font-bold leading-[0.9] tracking-[-0.04em]">
                   <span className="block text-white">DRS 3D</span>
                   <span className="block text-flame">WORLD</span>
                 </h1>
 
-                <p className="mt-7 max-w-xl text-balance-pretty text-base leading-relaxed text-ink-200 sm:text-lg">
+                <p className="mt-5 max-w-xl text-balance-pretty text-[15px] leading-relaxed text-ink-200 sm:text-base">
                   {site.slogan}.
                 </p>
 
-                <div className="pointer-events-auto mt-9 flex flex-col gap-3 sm:flex-row">
+                <div className="pointer-events-auto mt-7 flex flex-col gap-3 sm:flex-row">
                   <ButtonLink href="/quote" size="lg">
                     Get an instant quote
                     <ArrowRight className="h-4 w-4" />
