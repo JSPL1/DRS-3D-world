@@ -4,9 +4,13 @@ out/
 build/
 dist/
 
-# SQLite database + uploads are runtime state, never committed
+# Runtime state, never committed. Live uploads are written to data/uploads.
 data/
-public/uploads/
+
+# public/uploads/ is NOT ignored. The host wipes the application directory on
+# every deploy, so anything written there at runtime is lost. The studio's logo
+# and product-colour photographs, carried over from the previous host, are
+# shipped with the code instead — that is the only way they survive a deploy.
 
 .env
 .env.local

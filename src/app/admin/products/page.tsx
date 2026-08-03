@@ -111,7 +111,10 @@ export default async function AdminProductsPage({
                 <Th>Approval</Th>
                 <Th className="text-right">Views</Th>
                 <Th className="text-right">Updated</Th>
-                <Th />
+                {/* Pinned: with nine columns the actions scroll off the right
+                    on a narrow window or at a larger zoom, and Edit is the
+                    whole point of the row. */}
+                <Th className="sticky right-0 bg-[var(--surface)]" />
               </tr>
             </thead>
             <tbody>
@@ -173,7 +176,7 @@ export default async function AdminProductsPage({
                   <Td className="text-right text-[12.5px] text-ink-500">
                     {relativeTime(product.updated_at)}
                   </Td>
-                  <Td>
+                  <Td className="sticky right-0 bg-[var(--surface)]">
                     <div className="flex items-center justify-end gap-1">
                       <Link
                         href={`/products/${product.slug}`}
