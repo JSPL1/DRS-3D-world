@@ -4,6 +4,27 @@ import { cache } from 'react';
 
 import { DEFAULT_CURSOR, isCursorVariant, type CursorVariant } from '@/lib/cursor';
 import { getSettings } from '@/lib/queries';
+import { resolveUploadFile } from '@/lib/uploads';
+
+/** The lockup that ships with the code, so there is always something to draw. */
+const BUNDLED_LOGO = '/brand/logo.png';
+
+/**
+ * An uploaded image the host no longer has resolves to the bundled logo.
+ *
+ * Uploads live on a data disk outside the app directory, and moving hosts —
+ * or any host that wipes that directory on deploy — leaves the settings row
+ * pointing at a file that is simply gone. The result was a broken image where
+ * the studio's logo should be. Falling back keeps the header intact until
+ * somebody re-uploads, and costs one stat call on a request-cached path.
+ */
+function usableImage(url: string | null): string | null {
+  if (!url) return null;
+  if (!url.startsWith('/uploads/')) return url;
+
+  const name = url.slice('/uploads/'.length);
+  return resolveUploadFile([name]) ? url : null;
+}
 
 /**
  * Site-wide appearance, controlled by the administrator.
@@ -43,14 +64,18 @@ export const getBranding = cache(async (): Promise<Branding> => {
   const settings = await getSettings();
 
   const theme: Theme = settings.site_theme === 'light' ? 'light' : 'dark';
-  const logoUrl = settings.site_logo_url?.trim() || null;
-  const logoLightUrl = settings.site_logo_light_url?.trim() || null;
+
+  // Anything the host cannot actually serve is treated as absent, so the
+  // bundled lockup stands in rather than a broken image.
+  const logoUrl = usableImage(settings.site_logo_url?.trim() || null) ?? BUNDLED_LOGO;
+  const logoLightUrl = usableImage(settings.site_logo_light_url?.trim() || null);
 
   const cursorSetting = settings.site_cursor?.trim();
   const cursor: CursorVariant = isCursorVariant(cursorSetting) ? cursorSetting : DEFAULT_CURSOR;
 
   // An uploaded logo doubles as the favicon unless one is set explicitly.
-  const faviconUrl = settings.site_favicon_url?.trim() || logoUrl || '/favicon.svg';
+  const faviconUrl =
+    usableImage(settings.site_favicon_url?.trim() || null) ?? logoUrl ?? '/favicon.svg';
 
   // Uploaded filenames already carry a timestamp, so the URL changes whenever
   // the admin replaces the icon — which is what forces browsers to drop the
