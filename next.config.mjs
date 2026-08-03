@@ -1,18 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // better-sqlite3 is a native module — it must stay outside the server bundle.
-  serverExternalPackages: ['better-sqlite3'],
   images: {
     formats: ['image/avif', 'image/webp'],
 
-    // Next 16 requires local image sources to be declared explicitly.
+    // Next requires local image sources to be declared explicitly, and
+    // anything not listed here is refused by the optimiser with
+    // "url parameter is not allowed" — measured against the live site, which
+    // is how the bundled logo turned out to be missing from this list.
     // `search` is an exact-match field, not a glob — omitting it is what
     // permits arbitrary query strings, which the generated tiles rely on.
     localPatterns: [
       { pathname: '/api/tile' },
       { pathname: '/uploads/**' },
       { pathname: '/sample/**' },
+      { pathname: '/brand/**' },
     ],
 
     // The placeholder tiles at /api/tile are generated SVG, and the image
