@@ -19,6 +19,18 @@ CREATE TABLE IF NOT EXISTS users (
   -- Bumped on password change / forced logout: invalidates every issued JWT.
   token_version INT NOT NULL DEFAULT 0,
   last_login_at DATETIME,
+
+  -- Set the moment a customer passes the emailed code. Null means the account
+  -- exists but has never proved it owns the address. Declared here as well as
+  -- in addMissingColumns(): a database built from this file alone — an import
+  -- into a fresh host, before the app has ever booted — must already carry
+  -- every column the live data has, or the import fails on the first row.
+  email_verified_at DATETIME,
+  -- Loyalty: 1 point per ₹100 spent on a completed order.
+  loyalty_points    INT NOT NULL DEFAULT 0,
+  oauth_google_id   VARCHAR(255),
+  oauth_facebook_id VARCHAR(255),
+
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
