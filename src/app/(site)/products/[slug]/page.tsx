@@ -49,11 +49,21 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const gallery = await getProductImages(product.id, 'gallery');
+  const galleryImages = await getProductImages(product.id, 'gallery');
   const spin = await getProductImages(product.id, '360');
   const related = await getRelatedProducts(product.id, 3);
   const reviews = await getProductReviews(product.id);
   const colors = await getProductColors(product.id);
+
+  // A product whose photographs were all uploaded against colours has no
+  // gallery rows at all, and the viewer came up blank. Those photographs are
+  // of the product, so they stand in as the gallery.
+  const gallery =
+    galleryImages.length > 0
+      ? galleryImages
+      : colors
+          .filter((c) => c.imageUrl)
+          .map((c) => ({ id: c.id, url: c.imageUrl as string, alt: `${product.name} — ${c.name}` }));
 
   const user = await getCurrentUser();
   const wishlisted = user

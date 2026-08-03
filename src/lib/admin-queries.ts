@@ -261,8 +261,17 @@ export async function listAdminProducts(search?: string, limit = 60) {
             p.visibility, p.is_featured, p.view_count, p.updated_at,
             p.approval_status, p.created_by_name, p.updated_by_name,
             c.name AS category_name,
-            (SELECT url FROM product_images i WHERE i.product_id = p.id AND i.kind='gallery'
-              ORDER BY i.sort_order LIMIT 1) AS thumb
+            -- Falls back to the default colour's photograph, same as the
+            -- public catalogue: a product photographed only per-colour
+            -- otherwise shows an empty square in this list.
+            COALESCE(
+              (SELECT i.url FROM product_images i
+                WHERE i.product_id = p.id AND i.kind = 'gallery'
+                ORDER BY i.sort_order LIMIT 1),
+              (SELECT pc.image_url FROM product_colors pc
+                WHERE pc.product_id = p.id AND pc.image_url IS NOT NULL AND pc.image_url <> ''
+                ORDER BY pc.is_default DESC, pc.sort_order LIMIT 1)
+            ) AS thumb
      FROM products p LEFT JOIN categories c ON c.id = p.category_id
      ${search ? 'WHERE p.name LIKE ? OR p.sku LIKE ?' : ''}
      ORDER BY p.updated_at DESC LIMIT ?`,

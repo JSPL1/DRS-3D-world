@@ -89,14 +89,31 @@ const PUBLIC_PRODUCT = `p.status = 'published' AND p.visibility = 'public'
 /** Same rule, for queries that select from `products` without the `p` alias. */
 const PUBLIC_PRODUCT_BARE = PUBLIC_PRODUCT.replace(/\bp\./g, '');
 
+/**
+ * A product's picture, falling back to its default colour's photograph.
+ *
+ * A product entered through the panel can easily end up with colour photos
+ * and no gallery image — the colour editor is where the studio uploads, and
+ * it is the more useful photo anyway. Without the fallback those products
+ * showed an empty card, which reads as a broken site rather than a missing
+ * optional field.
+ */
+const THUMB = `
+  COALESCE(
+    (SELECT i.url FROM product_images i
+      WHERE i.product_id = p.id AND i.kind = 'gallery'
+      ORDER BY i.sort_order LIMIT 1),
+    (SELECT pc.image_url FROM product_colors pc
+      WHERE pc.product_id = p.id AND pc.image_url IS NOT NULL AND pc.image_url <> ''
+      ORDER BY pc.is_default DESC, pc.sort_order LIMIT 1)
+  )`;
+
 const PRODUCT_SELECT = `
   SELECT p.*,
          c.name AS category_name,
          c.slug AS category_slug,
          b.name AS brand_name,
-         (SELECT url FROM product_images i
-           WHERE i.product_id = p.id AND i.kind = 'gallery'
-           ORDER BY i.sort_order LIMIT 1) AS thumb
+         ${THUMB} AS thumb
   FROM products p
   LEFT JOIN categories c ON c.id = p.category_id
   LEFT JOIN brands b ON b.id = p.brand_id
