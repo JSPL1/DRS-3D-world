@@ -1,10 +1,8 @@
 import 'server-only';
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
 import mysql from 'mysql2/promise';
 
+import { SCHEMA_SQL } from './schema';
 import { seedIfEmpty } from './seed';
 
 /**
@@ -41,10 +39,21 @@ export function getPool(): mysql.Pool {
   return globalForDb.__drsPool;
 }
 
-/** Runs once per process: schema, additive migrations, seed, settings, cleanup. */
+/**
+ * Runs once per process: schema, additive migrations, seed, settings, cleanup.
+ *
+ * A failure is logged in full and the cached promise is dropped, so the next
+ * request retries. Holding on to a rejected promise meant one bad boot — a
+ * database still starting up, say — left the site returning errors until
+ * somebody restarted it by hand.
+ */
 function ready(): Promise<void> {
   if (!globalForDb.__drsReady) {
-    globalForDb.__drsReady = initialise();
+    globalForDb.__drsReady = initialise().catch((error) => {
+      console.error('[drs] database initialisation failed:', error);
+      globalForDb.__drsReady = undefined;
+      throw error;
+    });
   }
   return globalForDb.__drsReady;
 }
@@ -60,15 +69,13 @@ async function initialise(): Promise<void> {
 }
 
 /**
- * schema.sql runs on every boot. `CREATE TABLE IF NOT EXISTS` is naturally
+ * The schema runs on every boot. `CREATE TABLE IF NOT EXISTS` is naturally
  * idempotent; MySQL has no `CREATE INDEX IF NOT EXISTS`, so a rerun's
  * "Duplicate key name" (1061) and "Duplicate entry" for unique indexes are
  * swallowed here instead.
  */
 async function migrate(pool: mysql.Pool) {
-  const schemaPath = join(process.cwd(), 'src', 'lib', 'db', 'schema.sql');
-  const sql = readFileSync(schemaPath, 'utf8');
-  const statements = splitStatements(sql);
+  const statements = splitStatements(SCHEMA_SQL);
 
   const conn = await pool.getConnection();
   try {
@@ -86,12 +93,57 @@ async function migrate(pool: mysql.Pool) {
   }
 }
 
-/** Splits on statement-terminating semicolons; none of our DDL uses `;` inside strings. */
+/**
+ * Comments are stripped first, then the statements are split on semicolons.
+ *
+ * The order matters, and getting it wrong was silently fatal: the previous
+ * version split first and then discarded any chunk *beginning* with `--`.
+ * Every section heading in the schema sits directly above a CREATE TABLE, so
+ * ten tables — `users` among them — were thrown away with their headings and
+ * never created. The app then failed on the first query against a missing
+ * table, on a database it had itself just "migrated".
+ *
+ * Quotes are tracked so a `--` inside a string literal is left alone.
+ */
 function splitStatements(sql: string): string[] {
-  return sql
-    .split(/;\s*(?:\n|$)/)
+  let out = '';
+  let inString = false;
+
+  for (let i = 0; i < sql.length; i += 1) {
+    const ch = sql[i];
+
+    if (inString) {
+      if (ch === '\\') {
+        out += sql.slice(i, i + 2);
+        i += 1;
+        continue;
+      }
+      if (ch === "'") inString = false;
+      out += ch;
+      continue;
+    }
+
+    if (ch === "'") {
+      inString = true;
+      out += ch;
+      continue;
+    }
+
+    if (ch === '-' && sql[i + 1] === '-') {
+      const newline = sql.indexOf('\n', i);
+      if (newline === -1) break;
+      out += '\n';
+      i = newline;
+      continue;
+    }
+
+    out += ch;
+  }
+
+  return out
+    .split(';')
     .map((s) => s.trim())
-    .filter((s) => s.length > 0 && !s.startsWith('--'));
+    .filter((s) => s.length > 0);
 }
 
 /**
@@ -212,7 +264,7 @@ async function addMissingColumns(pool: mysql.Pool) {
   );
 
   // Sign-in accepts a mobile number, so a number can only belong to one
-  // account. Deliberately not in schema.sql: that file runs on every boot
+  // account. Deliberately not in the schema: that runs on every boot
   // against the live database, and a duplicate number left over from before
   // this rule existed would abort the migration and take the site down. Here
   // the failure is contained — sign-in by email keeps working either way.

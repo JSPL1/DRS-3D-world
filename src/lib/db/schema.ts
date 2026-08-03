@@ -1,3 +1,16 @@
+/**
+ * The database schema, as a string rather than a file.
+ *
+ * It used to be read from schema.sql at boot with readFileSync. On a host that
+ * deploys only the build output — or runs the server from a different working
+ * directory — that file is not there, the read throws, and because the result
+ * of the one-time initialisation is cached, *every* request afterwards fails
+ * with it. Compiling the schema into the bundle removes the filesystem from
+ * the boot path entirely.
+ *
+ * This is the single source of truth; schema.sql no longer exists.
+ */
+export const SCHEMA_SQL = `
 -- ============================================================
 -- DRS 3D WORLD — MySQL schema
 -- Idempotent: safe to run on every boot (CREATE TABLE IF NOT EXISTS).
@@ -488,15 +501,15 @@ CREATE TABLE IF NOT EXISTS quotes (
 -- ---------- System -----------------------------------------
 
 CREATE TABLE IF NOT EXISTS settings (
-  `key`      VARCHAR(255) PRIMARY KEY,
+  \`key\`      VARCHAR(255) PRIMARY KEY,
   value      TEXT,
-  `group`    VARCHAR(64) NOT NULL DEFAULT 'general',
+  \`group\`    VARCHAR(64) NOT NULL DEFAULT 'general',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS homepage_sections (
   id         INT AUTO_INCREMENT PRIMARY KEY,
-  `key`      VARCHAR(255) NOT NULL UNIQUE,
+  \`key\`      VARCHAR(255) NOT NULL UNIQUE,
   title      VARCHAR(255) NOT NULL,
   subtitle   TEXT,
   config     TEXT,       -- JSON blob for the section's own settings
@@ -568,3 +581,5 @@ CREATE TABLE IF NOT EXISTS wishlists (
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE UNIQUE INDEX idx_wishlists_user_product ON wishlists(user_id, product_id);
+
+`;
