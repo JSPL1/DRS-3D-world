@@ -3,7 +3,9 @@ import type { MetadataRoute } from 'next';
 import { getAllProductSlugs, getBlogPosts } from '@/lib/queries';
 import { site } from '@/lib/site';
 
-export const revalidate = 3600;
+// Generated per request, not at build time: the build machine has no route to
+// the database, and the catalogue changes whenever the studio edits it anyway.
+export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = site.url.replace(/\/$/, '');

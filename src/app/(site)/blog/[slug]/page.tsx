@@ -14,11 +14,6 @@ import { site } from '@/lib/site';
 // change effectively never reach visitors.
 export const dynamic = 'force-dynamic';
 
-export async function generateStaticParams() {
-  const posts = await getBlogPosts(100);
-  return posts.map((p) => ({ slug: p.slug }));
-}
-
 export async function generateMetadata({
   params,
 }: {

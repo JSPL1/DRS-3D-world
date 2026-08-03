@@ -12,7 +12,7 @@ import { RevealGroup, RevealItem } from '@/components/ui/Reveal';
 import { getCurrentUser } from '@/lib/auth/session';
 import { all } from '@/lib/db';
 import {
-  getAllProductSlugs, getProductBySlug, getProductColors, getProductImages,
+  getProductBySlug, getProductColors, getProductImages,
   getProductReviews, getRelatedProducts,
 } from '@/lib/queries';
 import { site } from '@/lib/site';
@@ -22,11 +22,6 @@ import { site } from '@/lib/site';
 // stale-while-revalidate of ~1 year to ISR responses, which made a theme
 // change effectively never reach visitors.
 export const dynamic = 'force-dynamic';
-
-export async function generateStaticParams() {
-  const slugs = await getAllProductSlugs();
-  return slugs.map((p) => ({ slug: p.slug }));
-}
 
 export async function generateMetadata({
   params,
