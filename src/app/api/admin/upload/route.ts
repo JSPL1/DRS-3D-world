@@ -8,7 +8,7 @@ import { guard } from '@/lib/auth/api-guard';
 import { can, type Permission } from '@/lib/auth/roles';
 import { logActivity } from '@/lib/auth/session';
 import { run } from '@/lib/db';
-import { uploadsDir } from '@/lib/uploads';
+import { storeUpload, uploadsDir } from '@/lib/uploads';
 
 export const runtime = 'nodejs';
 
@@ -118,10 +118,11 @@ export async function POST(req: Request) {
   // Random name: never trust the client's filename for a path.
   const name = `${purpose}-${Date.now()}-${randomBytes(4).toString('hex')}.${spec.ext}`;
 
-  // Not `public/` — Next only serves the public files that existed when the
-  // server booted, so anything written there is a 404 until the next restart.
-  // See lib/uploads.ts; /uploads/[...path] serves this directory.
+  // Two copies, deliberately. The disk copy serves the file locally and costs
+  // nothing; the database copy is the one that is still there after the host
+  // wipes the application directory on the next deploy.
   await writeFile(join(uploadsDir(), name), buffer, { mode: 0o644 });
+  await storeUpload(name, file.type, buffer);
 
   const url = `/uploads/${name}`;
 

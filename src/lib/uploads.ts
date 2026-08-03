@@ -3,6 +3,8 @@ import 'server-only';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 
+import { one, run } from '@/lib/db';
+
 /**
  * Where uploaded files live, and why it isn't `public/`.
  *
@@ -60,6 +62,36 @@ export function resolveUploadFile(segments: string[]): string | null {
   }
 
   return null;
+}
+
+/**
+ * Stores the bytes of an upload, so it survives a deploy.
+ *
+ * The disk copy is still written — it is what serves the file locally, and it
+ * costs nothing — but the database copy is the one that is still there after
+ * the host wipes the application directory.
+ */
+export async function storeUpload(name: string, mimeType: string, bytes: Buffer) {
+  await run(
+    `INSERT INTO upload_files (name, mime_type, size_bytes, bytes)
+     VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE mime_type = VALUES(mime_type),
+                             size_bytes = VALUES(size_bytes),
+                             bytes = VALUES(bytes)`,
+    [name, mimeType, bytes.length, bytes],
+  );
+}
+
+/** The stored bytes for an uploaded name, or null if we never had it. */
+export async function readStoredUpload(
+  name: string,
+): Promise<{ mimeType: string; bytes: Buffer } | null> {
+  const row = await one<{ mime_type: string; bytes: Buffer }>(
+    `SELECT mime_type, bytes FROM upload_files WHERE name = ?`,
+    [name],
+  );
+  if (!row) return null;
+  return { mimeType: row.mime_type, bytes: row.bytes };
 }
 
 /** Extensions the upload endpoint accepts, mapped back to their media type. */

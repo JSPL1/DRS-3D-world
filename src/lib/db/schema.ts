@@ -572,6 +572,24 @@ CREATE TABLE IF NOT EXISTS media (
 -- ---------- Redesign additions ------------------------------
 -- The heart icon on a product card. One row per (customer, product); the
 -- unique index is what makes "toggle" idempotent from the API.
+-- ---------- Uploaded file contents ---------------------------
+-- The bytes of every admin upload, not just a row describing one.
+--
+-- Uploads used to be written to a directory beside the application. This host
+-- erases the application directory on every deploy, so a logo uploaded on
+-- Monday was a broken image on Tuesday — the settings row still pointed at a
+-- file that no longer existed. The database is the only storage here that
+-- outlives a deploy, so the file itself lives in it.
+--
+-- LONGBLOB, but the upload endpoint caps a file at 5 MB long before this.
+CREATE TABLE IF NOT EXISTS upload_files (
+  name       VARCHAR(255) PRIMARY KEY,
+  mime_type  VARCHAR(128) NOT NULL,
+  size_bytes INT NOT NULL,
+  bytes      LONGBLOB NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS wishlists (
   id         INT AUTO_INCREMENT PRIMARY KEY,
   user_id    INT NOT NULL,

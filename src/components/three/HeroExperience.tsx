@@ -458,10 +458,18 @@ export function HeroExperience({
     <section
       ref={sectionRef}
       className="relative"
-      style={{ height: playMode === 'scroll' ? `${scrollVh}vh` : '100dvh' }}
+      style={{ height: playMode === 'scroll' ? `${scrollVh}vh` : '52dvh' }}
       aria-label="The DRS printing process"
     >
-      <div className={playMode === 'scroll' ? 'sticky top-0 h-dvh overflow-hidden' : 'h-dvh overflow-hidden'}>
+      {/* Half height. At a full viewport the printer dominated the homepage
+          and pushed everything the visitor came for below the fold. */}
+      <div
+        className={
+          playMode === 'scroll'
+            ? 'sticky top-0 h-[52dvh] min-h-[360px] overflow-hidden'
+            : 'h-[52dvh] min-h-[360px] overflow-hidden'
+        }
+      >
         {/* Backdrop */}
         <div
           aria-hidden
@@ -554,7 +562,7 @@ export function HeroExperience({
                 {...FADE}
                 className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center"
               >
-                <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-flame-500/30 bg-flame-500/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-flame-400 backdrop-blur-sm">
+                <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-flame-500/30 bg-flame-500/10 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-flame-400 backdrop-blur-sm">
                   <span className="relative flex h-1.5 w-1.5">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-flame-500" />
                     <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-flame-500" />
@@ -566,16 +574,16 @@ export function HeroExperience({
                     slogan, buttons and the scroll cue below all share one
                     viewport height, and at the old size that stack ran past
                     the bottom of the screen on a laptop or at browser zoom. */}
-                <h1 className="font-display text-[clamp(40px,8vw,88px)] font-bold leading-[0.9] tracking-[-0.04em]">
+                <h1 className="font-display text-[clamp(28px,5vw,52px)] font-bold leading-[0.92] tracking-[-0.04em]">
                   <span className="block text-white">DRS 3D</span>
                   <span className="block text-flame">WORLD</span>
                 </h1>
 
-                <p className="mt-5 max-w-xl text-balance-pretty text-[15px] leading-relaxed text-ink-200 sm:text-base">
+                <p className="mt-3 max-w-xl text-balance-pretty text-[14px] leading-relaxed text-ink-200">
                   {site.slogan}.
                 </p>
 
-                <div className="pointer-events-auto mt-7 flex flex-col gap-3 sm:flex-row">
+                <div className="pointer-events-auto mt-5 flex flex-col gap-3 sm:flex-row">
                   <ButtonLink href="/quote" size="lg">
                     Get an instant quote
                     <ArrowRight className="h-4 w-4" />
