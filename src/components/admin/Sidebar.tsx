@@ -2,7 +2,7 @@
 
 import {
   Activity, BadgePercent, Bell, Boxes, ChartPie, DatabaseBackup, FileText,
-  Folder, HelpCircle, Home, Image as ImageIcon, LayoutTemplate, LogOut,
+  Folder, HelpCircle, Home, Image as ImageIcon, KeyRound, LayoutTemplate, LogOut,
   Menu, MessageSquareQuote, Package, Search, Settings, ShoppingCart,
   Star, Tags, Users, Video, X,
 } from 'lucide-react';
@@ -160,9 +160,19 @@ export function Sidebar({
           </button>
         </div>
 
+        {/* Staff work in here, not in the customer account area, so the way
+            to change your own password has to be reachable from this panel. */}
+        <Link
+          href="/account#password"
+          className="mt-2 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-center text-[12px] text-ink-500 transition-colors hover:text-white"
+        >
+          <KeyRound className="h-3.5 w-3.5" />
+          Change my password
+        </Link>
+
         <Link
           href="/"
-          className="mt-2 block rounded-lg px-3 py-2 text-center text-[12px] text-ink-500 transition-colors hover:text-white"
+          className="mt-1 block rounded-lg px-3 py-2 text-center text-[12px] text-ink-500 transition-colors hover:text-white"
         >
           View the website →
         </Link>

@@ -2,6 +2,7 @@ import { FileText, Gift, Heart, Package, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
 import { money, shortDate, StatusPill } from '@/components/admin/Shell';
+import { ChangePassword } from '@/components/account/ChangePassword';
 import { LogoutButton } from '@/components/account/LogoutButton';
 import { ProductCard } from '@/components/sections/ProductCard';
 import { Logo } from '@/components/ui/Logo';
@@ -232,6 +233,12 @@ export default async function AccountPage() {
               ))}
             </ul>
           )}
+        </section>
+
+        {/* Security. The id is the target of "Change my password" in the
+            admin sidebar — staff never pass through this page otherwise. */}
+        <section id="password" className="mt-12 scroll-mt-8">
+          <ChangePassword />
         </section>
 
         <p className="mt-16 border-t border-ink-800 pt-8 text-center text-[12.5px] text-ink-500">

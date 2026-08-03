@@ -115,12 +115,18 @@ export function UserTable({
               {editable && isOpen && (
                 <tr>
                   <td colSpan={8} className="border-b border-white/[0.04] bg-[var(--surface-sunken)] p-0">
-                    <UserManagePanel
-                      userId={user.id}
-                      userName={user.name}
-                      currentRole={user.role as Role}
-                      isSelf={user.id === currentUserId}
-                    />
+                    {/* The running neon ring, same as an expanded order: on
+                        only while this account is open, gone the moment it
+                        closes. Two people share this panel, and it marks
+                        which account the changes below apply to. */}
+                    <div className="neon-frame m-4 p-1">
+                      <UserManagePanel
+                        userId={user.id}
+                        userName={user.name}
+                        currentRole={user.role as Role}
+                        isSelf={user.id === currentUserId}
+                      />
+                    </div>
                   </td>
                 </tr>
               )}
